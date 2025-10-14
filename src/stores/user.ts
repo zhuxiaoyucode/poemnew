@@ -78,7 +78,13 @@ export const useUserStore = defineStore('user', () => {
       username,
       email,
       password,
-      preferences: userPreferences.value,
+      preferences: {
+        favoritePoets: [],
+        favoriteTags: [],
+        readingLevel: 'beginner' as const,
+        theme: 'auto' as const,
+        language: 'zh' as const,
+      },
       createdAt: new Date(),
       lastLoginAt: new Date(),
     }
