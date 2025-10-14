@@ -12,9 +12,9 @@ const mockUsers = ref([
     preferences: {
       favoritePoets: [],
       favoriteTags: [],
-      readingLevel: 'beginner',
-      theme: 'auto',
-      language: 'zh',
+      readingLevel: 'beginner' as const,
+      theme: 'auto' as const,
+      language: 'zh' as const,
     },
     createdAt: new Date('2024-01-01'),
     lastLoginAt: new Date(),
@@ -29,9 +29,9 @@ export const useUserStore = defineStore('user', () => {
   const userPreferences = ref<UserPreferences>({
     favoritePoets: [],
     favoriteTags: [],
-    readingLevel: 'beginner',
-    theme: 'auto',
-    language: 'zh',
+    readingLevel: 'beginner' as const,
+    theme: 'auto' as const,
+    language: 'zh' as const,
   })
 
   // Actions
@@ -50,7 +50,13 @@ export const useUserStore = defineStore('user', () => {
       id: user.id,
       username: user.username,
       email: user.email,
-      preferences: user.preferences,
+      preferences: {
+        favoritePoets: user.preferences.favoritePoets || [],
+        favoriteTags: user.preferences.favoriteTags || [],
+        readingLevel: user.preferences.readingLevel as 'beginner' | 'intermediate' | 'advanced',
+        theme: user.preferences.theme as 'light' | 'dark' | 'auto',
+        language: user.preferences.language as 'zh' | 'en',
+      },
       createdAt: user.createdAt,
       lastLoginAt: user.lastLoginAt,
     }
@@ -96,7 +102,13 @@ export const useUserStore = defineStore('user', () => {
       id: newUser.id,
       username: newUser.username,
       email: newUser.email,
-      preferences: newUser.preferences,
+      preferences: {
+        favoritePoets: newUser.preferences.favoritePoets || [],
+        favoriteTags: newUser.preferences.favoriteTags || [],
+        readingLevel: newUser.preferences.readingLevel as 'beginner' | 'intermediate' | 'advanced',
+        theme: newUser.preferences.theme as 'light' | 'dark' | 'auto',
+        language: newUser.preferences.language as 'zh' | 'en',
+      },
       createdAt: newUser.createdAt,
       lastLoginAt: newUser.lastLoginAt,
     }

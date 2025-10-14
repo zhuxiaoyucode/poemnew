@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePoetryStore } from '@/stores/poetry'
 import { useUserStore } from '@/stores/user'
@@ -9,7 +9,15 @@ const poetryStore = usePoetryStore()
 const userStore = useUserStore()
 
 const searchQuery = ref('')
-const featuredPoems = ref(poetryStore.featuredPoems)
+const featuredPoems = computed(() => {
+  return poetryStore.featuredPoems.map((poem) => {
+    const poet = poetryStore.poets.find((p) => p.id === poem.poetId)
+    return {
+      ...poem,
+      poet: poet ? { name: poet.name } : { name: '未知' },
+    }
+  })
+})
 const popularPoets = ref(poetryStore.popularPoets)
 
 const dailyPoem = ref({
@@ -17,13 +25,13 @@ const dailyPoem = ref({
   title: '静夜思',
   content: '床前明月光，疑是地上霜。举头望明月，低头思故乡。',
   poet: '李白',
-  dynasty: '唐'
+  dynasty: '唐',
 })
 
 const specialTopics = ref([
-  { id: 1, title: '边塞诗精选', description: '感受边塞将士的豪情壮志', count: 15 },
-  { id: 2, title: '山水田园诗', description: '品味自然山水的宁静美好', count: 20 },
-  { id: 3, title: '思乡怀人诗', description: '体会游子思乡的深切情感', count: 18 }
+  { id: 1, title: '边塞诗精选', description: '感受边塞将士的豪情壮志', count: 6 },
+  { id: 2, title: '山水田园诗', description: '品味自然山水的宁静美好', count: 5 },
+  { id: 3, title: '思乡怀人诗', description: '体会游子思乡的深切情感', count: 5 },
 ])
 
 const handleSearch = async () => {
@@ -32,7 +40,7 @@ const handleSearch = async () => {
     // 跳转到搜索结果页面
     router.push({
       name: 'search',
-      query: { q: searchQuery.value }
+      query: { q: searchQuery.value },
     })
   }
 }
@@ -68,7 +76,7 @@ onMounted(() => {
       <div class="container">
         <h1 class="hero-title">诗海寻梦</h1>
         <p class="hero-subtitle">AI赋能的诗词赏析平台</p>
-        
+
         <div class="search-container">
           <input
             v-model="searchQuery"
@@ -96,9 +104,7 @@ onMounted(() => {
             <div class="poem-text">
               {{ dailyPoem.content }}
             </div>
-            <button @click="viewPoem(dailyPoem.id)" class="read-more-btn">
-              阅读全文
-            </button>
+            <button @click="viewPoem(dailyPoem.id)" class="read-more-btn">阅读全文</button>
           </div>
         </div>
       </div>
@@ -136,15 +142,9 @@ onMounted(() => {
           >
             <h4 class="poem-card-title">{{ poem.title }}</h4>
             <p class="poem-card-author">{{ poem.poet?.name || '未知' }} · {{ poem.dynasty }}</p>
-            <p class="poem-card-excerpt">
-              {{ poem.content.substring(0, 30) }}...
-            </p>
+            <p class="poem-card-excerpt">{{ poem.content.substring(0, 30) }}...</p>
             <div class="poem-tags">
-              <span
-                v-for="tag in poem.tags.slice(0, 2)"
-                :key="tag"
-                class="tag"
-              >
+              <span v-for="tag in poem.tags.slice(0, 2)" :key="tag" class="tag">
                 {{ tag }}
               </span>
             </div>
@@ -484,26 +484,26 @@ onMounted(() => {
   .hero-title {
     font-size: 2rem;
   }
-  
+
   .search-container {
     flex-direction: column;
   }
-  
+
   .topics-grid,
   .poems-grid,
   .poets-grid {
     grid-template-columns: 1fr;
     padding: 0 16px;
   }
-  
+
   .container {
     padding: 0 16px;
   }
-  
+
   .daily-poem-card {
     padding: 40px 20px;
   }
-  
+
   .topic-card,
   .poem-card,
   .poet-card {

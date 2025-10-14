@@ -19,12 +19,10 @@ const hasSearched = ref(false)
 const searchFilters = [
   { value: 'all', label: '全部' },
   { value: 'poems', label: '诗作' },
-  { value: 'poets', label: '诗人' }
+  { value: 'poets', label: '诗人' },
 ]
 
-const popularTags = [
-  '唐诗', '宋词', '李白', '杜甫', '苏轼', '思乡', '山水', '爱情'
-]
+const popularTags = ['唐诗', '宋词', '李白', '杜甫', '苏轼', '思乡', '山水', '爱情']
 
 onMounted(() => {
   // 从URL参数中获取搜索查询
@@ -34,12 +32,15 @@ onMounted(() => {
   }
 })
 
-watch(() => route.query.q, (newQuery) => {
-  if (newQuery && newQuery !== searchQuery.value) {
-    searchQuery.value = newQuery as string
-    performSearch()
-  }
-})
+watch(
+  () => route.query.q,
+  (newQuery) => {
+    if (newQuery && newQuery !== searchQuery.value) {
+      searchQuery.value = newQuery as string
+      performSearch()
+    }
+  },
+)
 
 const performSearch = async () => {
   if (!searchQuery.value.trim()) {
@@ -53,15 +54,21 @@ const performSearch = async () => {
 
   try {
     const params: PoetrySearchParams = { query: searchQuery.value }
-    
+
     // 根据筛选条件调整搜索参数
     if (activeFilter.value === 'poets') {
-      params.poet = searchQuery.value
+      // 搜索诗人时，通过诗人姓名查找对应的诗人ID
+      const matchedPoet = poetryStore.poets.find((poet) =>
+        poet.name.toLowerCase().includes(searchQuery.value.toLowerCase()),
+      )
+      if (matchedPoet) {
+        params.poet = matchedPoet.id
+      }
     }
 
     await poetryStore.searchPoems(params)
     searchResults.value = poetryStore.searchResults
-    
+
     // 记录搜索活动
     userStore.recordActivity(`search:${searchQuery.value}`, 'view')
   } finally {
@@ -70,11 +77,13 @@ const performSearch = async () => {
 }
 
 const handleSearch = () => {
-  // 更新URL参数
+  // 更新URL参数并执行搜索
   router.push({
     name: 'search',
-    query: { q: searchQuery.value }
+    query: { q: searchQuery.value },
   })
+  // 直接执行搜索，不等待路由更新
+  performSearch()
 }
 
 const searchByTag = (tag: string) => {
@@ -102,10 +111,11 @@ const getFilteredResults = () => {
   if (activeFilter.value === 'all') {
     return searchResults.value
   } else if (activeFilter.value === 'poets') {
-    // 在实际项目中，这里应该搜索诗人
-    return searchResults.value.filter(poem => 
-      poem.poet?.name.toLowerCase().includes(searchQuery.value.toLowerCase())
-    )
+    // 诗人筛选：显示与搜索关键词匹配的诗人作品
+    return searchResults.value.filter((poem) => {
+      const poet = poetryStore.poets.find((p) => p.id === poem.poetId)
+      return poet && poet.name.toLowerCase().includes(searchQuery.value.toLowerCase())
+    })
   }
   return searchResults.value
 }
@@ -120,7 +130,7 @@ const getFilteredResults = () => {
           <h1>搜索诗词</h1>
           <p>探索中华诗词的博大精深</p>
         </div>
-        
+
         <div class="search-container">
           <input
             v-model="searchQuery"
@@ -134,9 +144,7 @@ const getFilteredResults = () => {
             <span v-else>🔍</span>
             {{ isLoading ? '搜索中...' : '搜索' }}
           </button>
-          <button v-if="hasSearched" @click="clearSearch" class="clear-button">
-            清除
-          </button>
+          <button v-if="hasSearched" @click="clearSearch" class="clear-button">清除</button>
         </div>
 
         <!-- 搜索筛选 -->
@@ -171,9 +179,7 @@ const getFilteredResults = () => {
       <section v-if="hasSearched" class="results-section">
         <div class="results-header">
           <h2>搜索结果</h2>
-          <span class="results-count">
-            找到 {{ getFilteredResults().length }} 个结果
-          </span>
+          <span class="results-count"> 找到 {{ getFilteredResults().length }} 个结果 </span>
         </div>
 
         <div v-if="isLoading" class="loading">
@@ -194,15 +200,9 @@ const getFilteredResults = () => {
             <div class="result-content">
               <h3 class="poem-title">{{ poem.title }}</h3>
               <p class="poem-author">{{ poem.poet?.name }} · {{ poem.dynasty }}</p>
-              <p class="poem-excerpt">
-                {{ poem.content.substring(0, 80) }}...
-              </p>
+              <p class="poem-excerpt">{{ poem.content.substring(0, 80) }}...</p>
               <div class="poem-tags">
-                <span
-                  v-for="tag in poem.tags.slice(0, 3)"
-                  :key="tag"
-                  class="tag"
-                >
+                <span v-for="tag in poem.tags.slice(0, 3)" :key="tag" class="tag">
                   {{ tag }}
                 </span>
               </div>
@@ -215,7 +215,13 @@ const getFilteredResults = () => {
           <h3>相关诗人</h3>
           <div class="poets-list">
             <div
-              v-for="poet in Array.from(new Set(getFilteredResults().map(p => p.poet?.name).filter(Boolean)))"
+              v-for="poet in Array.from(
+                new Set(
+                  getFilteredResults()
+                    .map((p) => p.poet?.name)
+                    .filter(Boolean),
+                ),
+              )"
               :key="poet"
               class="poet-item"
               @click="viewPoet(poet || '')"
@@ -501,7 +507,8 @@ const getFilteredResults = () => {
 }
 
 /* 加载和空状态 */
-.loading, .no-results {
+.loading,
+.no-results {
   text-align: center;
   padding: 40px;
   color: #666;
@@ -512,11 +519,11 @@ const getFilteredResults = () => {
   .search-container {
     flex-direction: column;
   }
-  
+
   .results-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .search-filters {
     flex-wrap: wrap;
   }

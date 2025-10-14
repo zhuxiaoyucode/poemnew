@@ -26,7 +26,7 @@ const loadPoetData = async () => {
     const foundPoet = poetryStore.getPoetById(poetId.value)
     if (foundPoet) {
       poet.value = foundPoet
-      poetPoems.value = poetryStore.poems.filter(p => p.poetId === poetId.value)
+      poetPoems.value = poetryStore.poems.filter((p) => p.poetId === poetId.value)
     }
   } finally {
     isLoading.value = false
@@ -35,7 +35,6 @@ const loadPoetData = async () => {
 
 const viewPoem = (poemId: string) => {
   userStore.recordActivity(poemId, 'view')
-  // 跳转到诗作详情页
   router.push({ name: 'poem', params: { id: poemId } })
 }
 </script>
@@ -62,11 +61,7 @@ const viewPoem = (poemId: string) => {
       <section class="poet-tags" v-if="poet.tags.length > 0">
         <h3>风格标签</h3>
         <div class="tags-container">
-          <span
-            v-for="tag in poet.tags"
-            :key="tag"
-            class="tag"
-          >
+          <span v-for="tag in poet.tags" :key="tag" class="tag">
             {{ tag }}
           </span>
         </div>
@@ -83,17 +78,11 @@ const viewPoem = (poemId: string) => {
             @click="viewPoem(poem.id)"
           >
             <h4 class="poem-title">{{ poem.title }}</h4>
-            <p class="poem-excerpt">
-              {{ poem.content.substring(0, 60) }}...
-            </p>
+            <p class="poem-excerpt">{{ poem.content.substring(0, 60) }}...</p>
             <div class="poem-meta">
               <span class="dynasty">{{ poem.dynasty }}</span>
               <div class="poem-tags">
-                <span
-                  v-for="tag in poem.tags.slice(0, 2)"
-                  :key="tag"
-                  class="tag"
-                >
+                <span v-for="tag in poem.tags.slice(0, 2)" :key="tag" class="tag">
                   {{ tag }}
                 </span>
               </div>
@@ -107,7 +96,9 @@ const viewPoem = (poemId: string) => {
         <h3>同时代诗人</h3>
         <div class="poets-grid">
           <div
-            v-for="relatedPoet in poetryStore.poets.filter(p => p.id !== poetId && p.dynasty === (poet?.dynasty || ''))"
+            v-for="relatedPoet in poetryStore.poets.filter(
+              (p) => p.id !== poetId && p.dynasty === (poet?.dynasty || ''),
+            )"
             :key="relatedPoet.id"
             class="poet-card"
           >
@@ -338,7 +329,8 @@ const viewPoem = (poemId: string) => {
 }
 
 /* 加载和错误状态 */
-.loading, .not-found {
+.loading,
+.not-found {
   text-align: center;
   padding: 60px;
   font-size: 1.2rem;
@@ -351,15 +343,15 @@ const viewPoem = (poemId: string) => {
     text-align: center;
     gap: 20px;
   }
-  
+
   .poet-name {
     font-size: 2rem;
   }
-  
+
   .poems-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .poet-meta {
     justify-content: center;
   }

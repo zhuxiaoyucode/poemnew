@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { usePoetryStore } from '@/stores/poetry'
 import { useThemeStore } from '@/stores/theme'
@@ -14,9 +14,9 @@ const readingHistory = ref<UserActivity[]>([])
 const favoritePoems = ref<string[]>([])
 
 const userStats = computed(() => ({
-  poemsRead: userStore.userActivities.filter(a => a.activityType === 'view').length,
-  poemsLiked: userStore.userActivities.filter(a => a.activityType === 'like').length,
-  poemsShared: userStore.userActivities.filter(a => a.activityType === 'share').length
+  poemsRead: userStore.userActivities.filter((a) => a.activityType === 'view').length,
+  poemsLiked: userStore.userActivities.filter((a) => a.activityType === 'like').length,
+  poemsShared: userStore.userActivities.filter((a) => a.activityType === 'share').length,
 }))
 
 onMounted(() => {
@@ -29,17 +29,44 @@ const handleThemeChange = () => {
 }
 
 const loadUserData = () => {
-  readingHistory.value = userStore.getReadingHistory()
-  favoritePoems.value = userStore.getFavoritePoems()
+  if (userStore.isLoggedIn) {
+    // 重新获取阅读历史数据
+    readingHistory.value = userStore.getReadingHistory()
+    favoritePoems.value = userStore.getFavoritePoems()
+  } else {
+    readingHistory.value = []
+    favoritePoems.value = []
+  }
 }
 
+// 监听登录状态变化
+watch(
+  () => userStore.isLoggedIn,
+  (isLoggedIn) => {
+    if (isLoggedIn) {
+      loadUserData()
+    }
+  },
+)
+
 const getPoemById = (poemId: string) => {
-  return poetryStore.poems.find(p => p.id === poemId)
+  const poem = poetryStore.poems.find((p) => p.id === poemId)
+  if (poem) {
+    // 关联诗人信息
+    const poet = poetryStore.poets.find((p) => p.id === poem.poetId)
+    return {
+      ...poem,
+      poet: poet || null,
+    }
+  }
+  return null
 }
 
 const clearHistory = () => {
-  userStore.userActivities = userStore.userActivities.filter(a => a.activityType !== 'view')
-  readingHistory.value = []
+  if (userStore.isLoggedIn) {
+    userStore.userActivities = userStore.userActivities.filter((a) => a.activityType !== 'view')
+    readingHistory.value = []
+  }
 }
 
 const logout = () => {
@@ -109,13 +136,9 @@ const logout = () => {
           <h2>阅读历史</h2>
           <button @click="clearHistory" class="clear-btn">清空历史</button>
         </div>
-        
+
         <div v-if="readingHistory.length > 0" class="history-list">
-          <div
-            v-for="activity in readingHistory"
-            :key="activity.id"
-            class="history-item"
-          >
+          <div v-for="activity in readingHistory" :key="activity.id" class="history-item">
             <div class="poem-info">
               <h4>{{ getPoemById(activity.poemId)?.title || '未知诗作' }}</h4>
               <p>{{ getPoemById(activity.poemId)?.poet?.name || '未知诗人' }}</p>
@@ -133,13 +156,9 @@ const logout = () => {
       <!-- 我的收藏 -->
       <section v-if="activeTab === 'favorites'" class="tab-content">
         <h2>我的收藏</h2>
-        
+
         <div v-if="favoritePoems.length > 0" class="favorites-grid">
-          <div
-            v-for="poemId in favoritePoems"
-            :key="poemId"
-            class="favorite-item"
-          >
+          <div v-for="poemId in favoritePoems" :key="poemId" class="favorite-item">
             <div class="poem-info">
               <h4>{{ getPoemById(poemId)?.title || '未知诗作' }}</h4>
               <p>{{ getPoemById(poemId)?.poet?.name || '未知诗人' }}</p>
@@ -157,7 +176,7 @@ const logout = () => {
       <!-- 偏好设置 -->
       <section v-if="activeTab === 'settings'" class="tab-content">
         <h2>偏好设置</h2>
-        
+
         <div class="settings-form">
           <div class="setting-group">
             <label>阅读难度</label>
@@ -167,7 +186,7 @@ const logout = () => {
               <option value="advanced">高级</option>
             </select>
           </div>
-          
+
           <div class="setting-group">
             <label>主题模式</label>
             <select v-model="themeStore.currentTheme" @change="handleThemeChange">
@@ -176,7 +195,7 @@ const logout = () => {
               <option value="auto">自动</option>
             </select>
           </div>
-          
+
           <div class="setting-group">
             <label>语言</label>
             <select v-model="userStore.userPreferences.language">
@@ -243,7 +262,8 @@ const logout = () => {
   margin-bottom: 8px;
 }
 
-.user-email, .member-since {
+.user-email,
+.member-since {
   color: #666;
   margin-bottom: 4px;
 }
@@ -450,15 +470,15 @@ const logout = () => {
     text-align: center;
     gap: 20px;
   }
-  
+
   .user-stats {
     gap: 20px;
   }
-  
+
   .profile-tabs {
     flex-direction: column;
   }
-  
+
   .favorites-grid {
     grid-template-columns: 1fr;
   }

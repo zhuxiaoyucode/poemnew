@@ -16,14 +16,26 @@ const currentTopic = ref({
   id: '',
   title: '',
   description: '',
-  count: 0
+  count: 0,
 })
 
 // 专题分类映射
 const topicMap = {
-  '1': { title: '边塞诗精选', description: '感受边塞将士的豪情壮志', tags: ['边塞', '战争', '豪情'] },
-  '2': { title: '山水田园诗', description: '品味自然山水的宁静美好', tags: ['山水', '田园', '自然'] },
-  '3': { title: '思乡怀人诗', description: '体会游子思乡的深切情感', tags: ['思乡', '怀人', '离别'] }
+  '1': {
+    title: '边塞诗精选',
+    description: '感受边塞将士的豪情壮志',
+    tags: ['边塞', '战争', '豪情', '壮丽'],
+  },
+  '2': {
+    title: '山水田园诗',
+    description: '品味自然山水的宁静美好',
+    tags: ['山水', '田园', '自然', '禅意', '宁静'],
+  },
+  '3': {
+    title: '思乡怀人诗',
+    description: '体会游子思乡的深切情感',
+    tags: ['思乡', '怀人', '离别', '爱情', '月亮', '秋天'],
+  },
 }
 
 onMounted(async () => {
@@ -39,16 +51,22 @@ const loadTopicData = async () => {
       id: topicId.value,
       title: topicInfo.title,
       description: topicInfo.description,
-      count: 0
+      count: 0,
     }
-    
+
     // 根据专题标签搜索相关诗词
     const searchResults = await poetryStore.searchPoems({
-      query: topicInfo.tags.join(' '),
-      limit: 50
+      tags: topicInfo.tags,
     })
-    
-    topicPoems.value = searchResults || []
+
+    // 为每首诗词关联诗人信息
+    topicPoems.value = (searchResults || []).map((poem) => {
+      const poet = poetryStore.poets.find((p) => p.id === poem.poetId)
+      return {
+        ...poem,
+        poet: poet || null,
+      }
+    })
     currentTopic.value.count = topicPoems.value.length
   }
 }
@@ -68,9 +86,7 @@ const backToHome = () => {
     <div class="container">
       <!-- 专题头部 -->
       <section class="topic-header">
-        <button @click="backToHome" class="back-button">
-          ← 返回首页
-        </button>
+        <button @click="backToHome" class="back-button">← 返回首页</button>
         <div class="topic-info">
           <h1 class="topic-title">{{ currentTopic.title }}</h1>
           <p class="topic-description">{{ currentTopic.description }}</p>
@@ -96,18 +112,12 @@ const backToHome = () => {
                 {{ poem.content }}
               </div>
               <div class="poem-tags">
-                <span
-                  v-for="tag in poem.tags.slice(0, 3)"
-                  :key="tag"
-                  class="tag"
-                >
+                <span v-for="tag in poem.tags.slice(0, 3)" :key="tag" class="tag">
                   {{ tag }}
                 </span>
               </div>
             </div>
-            <button class="read-button" @click.stop="viewPoem(poem.id)">
-              阅读全文
-            </button>
+            <button class="read-button" @click.stop="viewPoem(poem.id)">阅读全文</button>
           </div>
         </div>
 
@@ -284,11 +294,11 @@ const backToHome = () => {
   .topic-title {
     font-size: 2rem;
   }
-  
+
   .poems-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .poem-card {
     padding: 20px;
   }
