@@ -13,16 +13,19 @@ const handleSearch = () => {
   if (searchQuery.value.trim()) {
     router.push({
       name: 'search',
-      query: { q: searchQuery.value }
+      query: { q: searchQuery.value },
     })
     searchQuery.value = ''
   }
 }
 
-
-
 const toggleMenu = () => {
   isMenuOpen.value = !isMenuOpen.value
+}
+
+const logoutAndCloseMenu = () => {
+  userStore.logout()
+  toggleMenu()
 }
 </script>
 
@@ -60,10 +63,17 @@ const toggleMenu = () => {
         <nav class="nav-section">
           <router-link to="/" class="nav-link">首页</router-link>
           <router-link to="/search" class="nav-link">探索</router-link>
-          <router-link v-if="userStore.isLoggedIn" to="/profile" class="nav-link">个人中心</router-link>
-          <button v-else @click="userStore.login('游客')" class="login-btn">
-            登录
-          </button>
+          <router-link v-if="userStore.isLoggedIn" to="/profile" class="nav-link"
+            >个人中心</router-link
+          >
+          <router-link v-else to="/login" class="nav-link">登录</router-link>
+          <router-link
+            v-if="userStore.isLoggedIn"
+            to="/"
+            @click="userStore.logout()"
+            class="nav-link"
+            >退出</router-link
+          >
         </nav>
 
         <!-- 移动端菜单按钮 -->
@@ -76,10 +86,19 @@ const toggleMenu = () => {
       <div v-if="isMenuOpen" class="mobile-menu">
         <router-link to="/" class="mobile-nav-link" @click="toggleMenu">首页</router-link>
         <router-link to="/search" class="mobile-nav-link" @click="toggleMenu">探索</router-link>
-        <router-link v-if="userStore.isLoggedIn" to="/profile" class="mobile-nav-link" @click="toggleMenu">个人中心</router-link>
-        <button v-else @click="userStore.login('游客'); toggleMenu()" class="mobile-login-btn">
-          登录
-        </button>
+        <router-link
+          v-if="userStore.isLoggedIn"
+          to="/profile"
+          class="mobile-nav-link"
+          @click="toggleMenu"
+          >个人中心</router-link
+        >
+        <router-link v-else to="/login" class="mobile-nav-link" @click="toggleMenu"
+          >登录</router-link
+        >
+        <div v-if="userStore.isLoggedIn" class="mobile-nav-link" @click="logoutAndCloseMenu">
+          退出
+        </div>
       </div>
     </div>
   </header>
@@ -268,19 +287,19 @@ const toggleMenu = () => {
   .header-content {
     gap: 10px;
   }
-  
+
   .search-section {
     max-width: 200px;
   }
-  
+
   .nav-section {
     display: none;
   }
-  
+
   .mobile-menu-btn {
     display: block;
   }
-  
+
   .mobile-menu {
     display: flex;
   }
@@ -290,7 +309,7 @@ const toggleMenu = () => {
   .search-section {
     display: none;
   }
-  
+
   .logo-text {
     font-size: 1.2rem;
   }
