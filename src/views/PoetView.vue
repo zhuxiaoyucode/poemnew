@@ -23,10 +23,20 @@ onMounted(async () => {
 const loadPoetData = async () => {
   isLoading.value = true
   try {
-    const foundPoet = poetryStore.getPoetById(poetId.value)
+    const foundPoet = await poetryStore.getPoetById(poetId.value)
     if (foundPoet) {
       poet.value = foundPoet
-      poetPoems.value = poetryStore.poems.filter((p) => p.poetId === poetId.value)
+
+      // 使用 Set 来去重，确保每首诗只显示一次
+      const uniquePoems = new Map()
+      poetryStore.poems.forEach((poem) => {
+        // 修复诗人ID匹配问题：使用诗人姓名匹配而不是ID匹配
+        if (poem.poet?.name === poet.value?.name && !uniquePoems.has(poem.id)) {
+          uniquePoems.set(poem.id, poem)
+        }
+      })
+
+      poetPoems.value = Array.from(uniquePoems.values())
     }
   } finally {
     isLoading.value = false
@@ -97,7 +107,7 @@ const viewPoem = (poemId: string) => {
         <div class="poets-grid">
           <div
             v-for="relatedPoet in poetryStore.poets.filter(
-              (p) => p.id !== poetId && p.dynasty === (poet?.dynasty || ''),
+              (p) => p.name !== poet?.name && p.dynasty === (poet?.dynasty || ''),
             )"
             :key="relatedPoet.id"
             class="poet-card"
@@ -125,14 +135,15 @@ const viewPoem = (poemId: string) => {
 <style scoped>
 .poet-view {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  padding: 40px 0;
+  background: #f8f9fa;
+  padding: 2rem 0;
 }
 
 .container {
-  max-width: 1000px;
+  width: 100%;
+  max-width: none;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 2rem;
 }
 
 /* 诗人头部 */

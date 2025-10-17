@@ -54,6 +54,14 @@ export interface PoetrySearchParams {
   limit?: number
 }
 
+export interface PoemType {
+  id: number
+  name: string
+  description: string
+  count: number
+  color: string
+}
+
 export interface PoetryRecommendation {
   poem: Poem
   reason: string

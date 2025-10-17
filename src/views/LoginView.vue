@@ -21,10 +21,14 @@ const handleLogin = async () => {
   errorMessage.value = ''
 
   try {
-    await userStore.login(username.value, password.value)
-    router.push('/')
-  } catch (error) {
-    errorMessage.value = '登录失败，请检查用户名和密码'
+    const success = await userStore.login(username.value, password.value)
+    if (success) {
+      router.push('/')
+    } else {
+      errorMessage.value = '用户名或密码错误'
+    }
+  } catch (error: any) {
+    errorMessage.value = error.message || '登录失败，请检查用户名和密码'
   } finally {
     isLoading.value = false
   }
@@ -97,16 +101,17 @@ const goToHome = () => {
 <style scoped>
 .login-view {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #f8f9fa;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px;
+  padding: 2rem;
 }
 
 .container {
   width: 100%;
   max-width: 400px;
+  padding: 0 2rem;
 }
 
 .login-card {

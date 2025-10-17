@@ -1,614 +1,696 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePoetryStore } from '@/stores/poetry'
-import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
 const poetryStore = usePoetryStore()
-const userStore = useUserStore()
 
-const searchQuery = ref('')
-const featuredPoems = computed(() => {
-  return poetryStore.featuredPoems.map((poem) => {
-    const poet = poetryStore.poets.find((p) => p.id === poem.poetId)
-    return {
-      ...poem,
-      poet: poet ? { name: poet.name } : { name: '未知' },
-    }
-  })
-})
-const popularPoets = ref(poetryStore.popularPoets)
+// 加载状态
+const isLoading = ref(true)
+const error = ref('')
 
-const dailyPoem = ref({
-  id: '1',
-  title: '静夜思',
-  content: '床前明月光，疑是地上霜。举头望明月，低头思故乡。',
-  poet: '李白',
-  dynasty: '唐',
-})
-
-const specialTopics = ref([
-  { id: 1, title: '边塞诗精选', description: '感受边塞将士的豪情壮志', count: 6 },
-  { id: 2, title: '山水田园诗', description: '品味自然山水的宁静美好', count: 5 },
-  { id: 3, title: '思乡怀人诗', description: '体会游子思乡的深切情感', count: 5 },
+// 真实的诗歌类型数据（从数据库获取）
+const categories = ref([
+  {
+    id: 1,
+    name: '思乡诗',
+    count: 0,
+    color: '#8b5a2b',
+    icon: '🏠',
+    description: '表达对故乡、亲人的思念之情',
+  },
+  {
+    id: 2,
+    name: '山水诗',
+    count: 0,
+    color: '#4a90e2',
+    icon: '⛰️',
+    description: '描写自然山水风光',
+  },
+  { id: 3, name: '送别诗', count: 0, color: '#d0021b', icon: '👋', description: '表达离别之情' },
+  { id: 4, name: '爱国诗', count: 0, color: '#ff6b6b', icon: '🇨🇳', description: '表达爱国情怀' },
+  {
+    id: 5,
+    name: '田园诗',
+    count: 0,
+    color: '#4ecdc4',
+    icon: '🌾',
+    description: '描写田园生活和自然风光',
+  },
+  { id: 6, name: '爱情诗', count: 0, color: '#ff9ff3', icon: '💕', description: '表达爱情情感' },
+  {
+    id: 7,
+    name: '边塞诗',
+    count: 0,
+    color: '#ff9f43',
+    icon: '⚔️',
+    description: '描写边塞生活和战争',
+  },
+  { id: 8, name: '哲理诗', count: 0, color: '#2bcbba', icon: '💭', description: '蕴含人生哲理' },
 ])
 
-const handleSearch = async () => {
-  if (searchQuery.value.trim()) {
-    await poetryStore.searchPoems({ query: searchQuery.value })
-    // 跳转到搜索结果页面
-    router.push({
-      name: 'search',
-      query: { q: searchQuery.value },
-    })
-  }
+const featuredPoems = ref([
+  {
+    id: '1',
+    title: '静夜思',
+    author: '李白',
+    dynasty: '唐代',
+    excerpt: '床前明月光，疑是地上霜。举头望明月，低头思故乡。',
+    tags: ['思乡', '月亮', '夜晚'],
+  },
+  {
+    id: '2',
+    title: '春晓',
+    author: '孟浩然',
+    dynasty: '唐代',
+    excerpt: '春眠不觉晓，处处闻啼鸟。夜来风雨声，花落知多少。',
+    tags: ['春天', '自然', '生活'],
+  },
+  {
+    id: '3',
+    title: '登鹳雀楼',
+    author: '王之涣',
+    dynasty: '唐代',
+    excerpt: '白日依山尽，黄河入海流。欲穷千里目，更上一层楼。',
+    tags: ['登高', '壮丽', '哲理'],
+  },
+])
+
+const navigateToCategory = (categoryId: number) => {
+  router.push({ name: 'categories', query: { typeId: categoryId } })
 }
 
-const viewPoem = (poemId: string) => {
-  userStore.recordActivity(poemId, 'view')
-  // 跳转到诗作详情页
+const navigateToPoem = (poemId: string) => {
   router.push({ name: 'poem', params: { id: poemId } })
 }
 
-const viewTopic = (topicId: string) => {
-  userStore.recordActivity(`topic_${topicId}`, 'view')
-  // 跳转到专题详情页
-  router.push({ name: 'topic', params: { id: topicId } })
+const navigateToCategories = () => {
+  router.push({ name: 'categories' })
 }
 
-const viewPoet = (poetId: string) => {
-  userStore.recordActivity(`poet_${poetId}`, 'view')
-  // 跳转到诗人详情页
-  router.push({ name: 'poet', params: { id: poetId } })
+const navigateToSearch = () => {
+  // 跳转到搜索页面并显示所有诗歌
+  router.push({
+    name: 'search',
+    query: { q: '', showAll: 'true' },
+  })
 }
 
-onMounted(() => {
-  // 初始化数据
-  poetryStore.searchPoems({ limit: 10 })
+const navigateToRegister = () => {
+  router.push({ name: 'register' })
+}
+
+// 初始化数据
+const initializeData = async () => {
+  try {
+    error.value = ''
+    await poetryStore.initializeData()
+
+    // 更新分类数据
+    const realCategories = poetryStore.categories.slice(0, 8) // 取前8个分类
+    categories.value = realCategories.map((cat) => ({
+      ...cat,
+      icon: getCategoryIcon(cat.name),
+      description: cat.description || '探索该主题的诗词作品',
+    }))
+  } catch (err: any) {
+    console.error('初始化数据失败:', err)
+    error.value = err.message || '数据加载失败，请稍后重试'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// 重试函数
+const retry = () => {
+  error.value = ''
+  isLoading.value = true
+  initializeData()
+}
+
+// 获取分类图标
+const getCategoryIcon = (categoryName: string): string => {
+  const iconMap: Record<string, string> = {
+    思乡诗: '🏠',
+    山水诗: '⛰️',
+    记行诗: '🚶',
+    送别诗: '👋',
+    抒情诗: '💖',
+    咏物诗: '🌸',
+    爱国诗: '🇨🇳',
+    田园诗: '🌾',
+    怀古诗: '📜',
+    爱情诗: '💕',
+    酬赠诗: '🎁',
+    边塞诗: '⚔️',
+    叙事诗: '📖',
+    讽喻诗: '🎭',
+    亲情诗: '👨‍👩‍👧‍👦',
+    哲理诗: '💭',
+    节日诗: '🎉',
+    咏史怀古: '🏛️',
+  }
+  return iconMap[categoryName] || '📚'
+}
+
+onMounted(async () => {
+  console.log('诗词网站首页加载完成')
+  await initializeData()
 })
 </script>
 
 <template>
   <div class="home-view">
-    <!-- 顶部搜索区域 -->
-    <section class="hero-section">
-      <div class="container">
-        <h1 class="hero-title">诗海寻梦</h1>
-        <p class="hero-subtitle">AI赋能的诗词赏析平台</p>
+    <!-- 加载状态 -->
+    <div v-if="isLoading" class="loading-container">
+      <div class="loading-spinner"></div>
+      <p>正在加载...</p>
+    </div>
 
-        <div class="search-container">
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="搜索诗词、诗人或主题..."
-            class="search-input"
-            @keyup.enter="handleSearch"
-          />
-          <button @click="handleSearch" class="search-button">
-            <span class="search-icon">🔍</span>
-            搜索
-          </button>
-        </div>
-      </div>
-    </section>
+    <!-- 错误状态 -->
+    <div v-else-if="error" class="error-container">
+      <div class="error-icon">⚠️</div>
+      <h3>加载失败</h3>
+      <p>{{ error }}</p>
+      <button @click="retry" class="btn-primary">重试</button>
+    </div>
 
-    <!-- 每日一诗 -->
-    <section class="daily-poem-section">
-      <div class="container">
-        <h2 class="section-title">今日推荐</h2>
-        <div class="daily-poem-card">
-          <div class="poem-content">
-            <h3 class="poem-title">{{ dailyPoem.title }}</h3>
-            <p class="poem-author">{{ dailyPoem.poet }} · {{ dailyPoem.dynasty }}</p>
-            <div class="poem-text">
-              {{ dailyPoem.content }}
-            </div>
-            <button @click="viewPoem(dailyPoem.id)" class="read-more-btn">阅读全文</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 专题策划 -->
-    <section class="topics-section">
-      <div class="container">
-        <h2 class="section-title">专题策划</h2>
-        <div class="topics-grid">
-          <div
-            v-for="topic in specialTopics"
-            :key="topic.id"
-            class="topic-card"
-            @click="viewTopic(topic.id.toString())"
-          >
-            <h4 class="topic-title">{{ topic.title }}</h4>
-            <p class="topic-description">{{ topic.description }}</p>
-            <span class="topic-count">{{ topic.count }}首诗</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 热门诗作 -->
-    <section class="featured-poems-section">
-      <div class="container">
-        <h2 class="section-title">热门诗作</h2>
-        <div class="poems-grid">
-          <div
-            v-for="poem in featuredPoems"
-            :key="poem.id"
-            class="poem-card"
-            @click="viewPoem(poem.id)"
-          >
-            <h4 class="poem-card-title">{{ poem.title }}</h4>
-            <p class="poem-card-author">{{ poem.poet?.name || '未知' }} · {{ poem.dynasty }}</p>
-            <p class="poem-card-excerpt">{{ poem.content.substring(0, 30) }}...</p>
-            <div class="poem-tags">
-              <span v-for="tag in poem.tags.slice(0, 2)" :key="tag" class="tag">
-                {{ tag }}
-              </span>
+    <!-- 内容区域 -->
+    <div v-else>
+      <!-- 英雄区域 -->
+      <section class="hero-section">
+        <div class="container">
+          <div class="hero-content">
+            <h1 class="hero-title">品味千年诗意<br />探索文化瑰宝</h1>
+            <p class="hero-subtitle">
+              诗海寻梦带您领略中华诗词的博大精深，从古典诗词中汲取智慧，感受文字之美
+            </p>
+            <div class="hero-actions">
+              <button class="btn-primary" @click="navigateToSearch">开始探索</button>
+              <button class="btn-secondary" @click="navigateToRegister">加入我们</button>
             </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- 热门诗人 -->
-    <section class="popular-poets-section">
-      <div class="container">
-        <h2 class="section-title">热门诗人</h2>
-        <div class="poets-grid">
-          <div
-            v-for="poet in popularPoets"
-            :key="poet.id"
-            class="poet-card"
-            @click="viewPoet(poet.id)"
-          >
-            <div class="poet-avatar">
-              {{ poet.name.charAt(0) }}
+      <!-- 诗歌分类 -->
+      <section id="categories" class="categories-section">
+        <div class="container">
+          <div class="section-header">
+            <h2 class="section-title">诗歌分类</h2>
+            <button class="view-all-btn" @click="navigateToCategories">查看全部分类</button>
+          </div>
+          <p class="section-subtitle">按主题探索不同风格的诗词作品</p>
+
+          <div class="categories-grid">
+            <div
+              v-for="category in categories.slice(0, 8)"
+              :key="category.id"
+              class="category-card"
+              :style="{
+                backgroundColor: category.color + '20',
+                borderColor: category.color,
+              }"
+              @click="navigateToCategory(category.id)"
+            >
+              <div class="category-icon" :style="{ color: category.color }">
+                <span class="icon">{{ category.icon }}</span>
+              </div>
+              <div class="category-info">
+                <h3 class="category-name">{{ category.name }}</h3>
+                <p class="category-description">{{ category.description }}</p>
+                <span class="category-count">{{ category.count }} 首</span>
+              </div>
             </div>
-            <h4 class="poet-name">{{ poet.name }}</h4>
-            <p class="poet-dynasty">{{ poet.dynasty }}</p>
-            <p class="poet-bio">{{ poet.biography.substring(0, 50) }}...</p>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+
+      <!-- 诗歌精选 -->
+      <section id="featured" class="featured-section">
+        <div class="container">
+          <div class="section-header">
+            <h2 class="section-title">诗歌精选</h2>
+            <button class="view-all-btn" @click="navigateToSearch">查看全部</button>
+          </div>
+
+          <div class="poems-grid">
+            <div
+              v-for="poem in featuredPoems"
+              :key="poem.id"
+              class="poem-card"
+              @click="navigateToPoem(poem.id)"
+            >
+              <div class="poem-header">
+                <h3 class="poem-title">{{ poem.title }}</h3>
+                <div class="poem-meta">
+                  <span class="poem-author">{{ poem.author }}</span>
+                  <span class="poem-dynasty">{{ poem.dynasty }}</span>
+                </div>
+              </div>
+              <div class="poem-content">
+                <p class="poem-excerpt">{{ poem.excerpt }}</p>
+              </div>
+              <div class="poem-tags">
+                <span v-for="tag in poem.tags" :key="tag" class="tag">{{ tag }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .home-view {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  min-height: calc(100vh - 80px);
+  background: #f8f9fa;
+  color: #2c3e50;
+  font-family: 'SimSun', serif;
+  width: 100%;
+  margin-top: 80px; /* 为AppHeader留出空间 */
 }
 
 .container {
   width: 100%;
   max-width: 1200px;
+  padding: 0 2rem;
   margin: 0 auto;
-  padding: 0 20px;
+}
+
+/* 加载状态 */
+.loading-container {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
 }
 
-/* Hero Section */
-.hero-section {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 80px 0;
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #8b5a2b;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+.loading-container p {
+  color: #666;
+  font-size: 1.1rem;
+}
+
+/* 错误状态 */
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
   text-align: center;
+  padding: 2rem;
+}
+
+.error-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.error-container h3 {
+  color: #d32f2f;
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+}
+
+.error-container p {
+  color: #666;
+  margin-bottom: 2rem;
+  font-size: 1.1rem;
+  max-width: 400px;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* 英雄区域 */
+.hero-section {
+  padding: 120px 0 80px;
+  background: linear-gradient(135deg, #f5f5dc 0%, #d2b48c 100%);
+  text-align: center;
+}
+
+.hero-container {
+  max-width: 800px;
+  margin: 0 auto;
 }
 
 .hero-title {
-  font-size: 3rem;
+  font-size: 3.5rem;
   font-weight: 700;
-  margin-bottom: 1rem;
-  font-family: 'SimSun', serif;
+  color: #8b5a2b;
+  line-height: 1.2;
+  margin-bottom: 1.5rem;
 }
 
 .hero-subtitle {
-  font-size: 1.2rem;
-  opacity: 0.9;
-  margin-bottom: 2rem;
-}
-
-.search-container {
-  display: flex;
-  max-width: 600px;
-  width: 100%;
-  margin: 0 auto;
-  gap: 10px;
-}
-
-.search-input {
-  flex: 1;
-  padding: 12px 16px;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-}
-
-.search-button {
-  padding: 12px 24px;
-  background: #ff6b6b;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 1rem;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.search-button:hover {
-  background: #ff5252;
-}
-
-/* Sections */
-.section-title {
-  font-size: 2rem;
-  text-align: center;
-  margin-bottom: 2rem;
+  font-size: 1.3rem;
   color: #2c3e50;
-  font-family: 'SimSun', serif;
+  margin-bottom: 2.5rem;
+  line-height: 1.6;
 }
 
-/* Daily Poem */
-.daily-poem-section {
-  padding: 80px 0;
+.hero-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* 使用全局样式，移除重复定义 */
+
+/* 分类区域 */
+.categories-section {
+  padding: 100px 0;
   background: white;
 }
 
-.daily-poem-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 60px;
-  border-radius: 16px;
+.section-title {
+  font-size: 2.5rem;
+  font-weight: 700;
   text-align: center;
-  max-width: 800px;
-  width: 100%;
+  color: #8b5a2b;
+  margin-bottom: 1.5rem;
+}
+
+.section-subtitle {
+  text-align: center;
+  color: #666;
+  margin-bottom: 4rem;
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+.categories-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2rem;
+  max-width: 1200px;
   margin: 0 auto;
+  padding: 0 2rem;
 }
 
-.poem-title {
-  font-size: 2rem;
-  margin-bottom: 1rem;
-}
-
-.poem-author {
-  opacity: 0.8;
-  margin-bottom: 2rem;
-}
-
-.poem-text {
-  font-size: 1.2rem;
-  line-height: 2;
-  margin-bottom: 2rem;
-  white-space: pre-line;
-}
-
-.read-more-btn {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  padding: 10px 20px;
-  border-radius: 6px;
+.category-card {
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 1rem;
   cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-height: 100px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
-.read-more-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
+.category-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
 }
 
-/* Topics */
-.topics-section {
+.category-card:hover {
+  transform: translateY(-5px) scale(1.02);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+.category-icon {
+  font-size: 2.5rem;
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.category-card:hover .category-icon {
+  transform: scale(1.1);
+}
+
+.category-info {
+  flex: 1;
+  text-align: left;
+}
+
+.category-name {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 0.3rem;
+}
+
+.category-description {
+  font-size: 0.85rem;
+  color: #7f8c8d;
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+}
+
+.category-count {
+  color: #95a5a6;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+/* 精选诗歌 */
+.featured-section {
   padding: 80px 0;
   background: #f8f9fa;
 }
 
-.topics-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-  gap: 24px;
-  justify-items: center;
-  width: 100%;
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3rem;
   max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 20px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
-.topic-card {
-  background: white;
-  padding: 24px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+.view-all-btn {
+  background: #8b5a2b;
+  color: white;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 0.5rem;
   cursor: pointer;
-  transition: transform 0.2s;
-  width: 100%;
-  max-width: 350px;
-  margin: 0 auto;
+  transition: background 0.3s ease;
 }
 
-.topic-card:hover {
-  transform: translateY(-2px);
-}
-
-.topic-title {
-  font-size: 1.2rem;
-  margin-bottom: 8px;
-  color: #2c3e50;
-}
-
-.topic-description {
-  color: #666;
-  margin-bottom: 12px;
-}
-
-.topic-count {
-  color: #667eea;
-  font-size: 0.9rem;
-}
-
-/* Poems Grid */
-.featured-poems-section {
-  padding: 80px 0;
-  background: white;
+.view-all-btn:hover {
+  background: #7a4a1f;
 }
 
 .poems-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-  gap: 24px;
-  justify-items: center;
-  width: 100%;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 20px;
 }
 
 .poem-card {
   background: white;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   cursor: pointer;
-  transition: all 0.2s;
-  border: 1px solid #e9ecef;
-  width: 100%;
-  max-width: 350px;
-  margin: 0 auto;
+  transition: all 0.3s ease;
 }
 
 .poem-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
 }
 
-.poem-card-title {
-  font-size: 1.1rem;
-  margin-bottom: 8px;
+.poem-title {
+  font-size: 1.3rem;
+  font-weight: 600;
   color: #2c3e50;
+  margin-bottom: 0.5rem;
 }
 
-.poem-card-author {
+.poem-meta {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.poem-author,
+.poem-dynasty {
   color: #666;
   font-size: 0.9rem;
-  margin-bottom: 12px;
 }
 
-.poem-card-excerpt {
+.poem-excerpt {
   color: #555;
-  line-height: 1.5;
-  margin-bottom: 12px;
+  line-height: 1.6;
+  margin-bottom: 1rem;
 }
 
 .poem-tags {
   display: flex;
-  gap: 6px;
+  gap: 0.5rem;
   flex-wrap: wrap;
 }
 
 .tag {
   background: #e3f2fd;
   color: #1976d2;
-  padding: 2px 8px;
-  border-radius: 12px;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.3rem;
   font-size: 0.8rem;
 }
 
-/* Poets Grid */
-.popular-poets-section {
-  padding: 80px 0;
-  background: #f8f9fa;
+/* 页脚 */
+.footer {
+  background: #2c3e50;
+  color: white;
+  padding: 60px 0 20px;
 }
 
-.poets-grid {
+.footer-content {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 24px;
-  justify-items: center;
-  width: 100%;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3rem;
+  max-width: 1200px;
+  margin: 0 auto 3rem;
+}
+
+.footer-section h3,
+.footer-section h4 {
+  margin-bottom: 1rem;
+}
+
+.footer-section ul {
+  list-style: none;
+  padding: 0;
+}
+
+.footer-section ul li {
+  margin-bottom: 0.5rem;
+}
+
+.footer-section a {
+  color: #bdc3c7;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.footer-section a:hover {
+  color: white;
+}
+
+.footer-bottom {
+  text-align: center;
+  padding-top: 2rem;
+  border-top: 1px solid #34495e;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 20px;
 }
 
-.poet-card {
-  background: white;
-  padding: 24px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  text-align: center;
-  width: 100%;
-  max-width: 300px;
-  margin: 0 auto;
-}
+/* 响应式设计 */
+@media (max-width: 1024px) {
+  .categories-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
 
-.poet-avatar {
-  width: 60px;
-  height: 60px;
-  background: #667eea;
-  color: white;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  margin: 0 auto 16px;
-}
-
-.poet-name {
-  font-size: 1.2rem;
-  margin-bottom: 4px;
-  color: #2c3e50;
-}
-
-.poet-dynasty {
-  color: #666;
-  margin-bottom: 12px;
-  font-size: 0.9rem;
-}
-
-.poet-bio {
-  color: #555;
-  line-height: 1.4;
+  .poems-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 768px) {
   .hero-title {
+    font-size: 2.5rem;
+  }
+
+  .categories-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+
+  .poems-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .section-header {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+
+  .category-card {
+    min-height: 80px;
+    padding: 1rem;
+  }
+
+  .hero-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .hero-actions .btn-primary,
+  .hero-actions .btn-secondary {
+    width: 200px;
+  }
+}
+
+@media (max-width: 480px) {
+  .categories-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-title {
     font-size: 2rem;
   }
 
-  .search-container {
-    flex-direction: column;
-  }
-
-  .topics-grid,
-  .poems-grid,
-  .poets-grid {
-    grid-template-columns: 1fr;
-    padding: 0 16px;
+  .section-title {
+    font-size: 2rem;
   }
 
   .container {
-    padding: 0 16px;
+    padding: 0 1rem;
   }
 
-  .daily-poem-card {
-    padding: 40px 20px;
+  .hero-section {
+    padding: 80px 0 60px;
   }
 
-  .topic-card,
-  .poem-card,
-  .poet-card {
-    max-width: 100%;
+  .categories-section {
+    padding: 60px 0;
+  }
+
+  .featured-section {
+    padding: 60px 0;
   }
 }
 
-/* 深色主题样式 */
-.dark-theme .home-view {
-  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+/* 深色主题下的错误状态 */
+.dark-theme .error-container h3 {
+  color: #ff6b6b;
 }
 
-.dark-theme .hero-section {
-  background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-hover) 100%);
-}
-
-.dark-theme .section-title {
-  color: var(--text-primary);
-}
-
-.dark-theme .daily-poem-section,
-.dark-theme .featured-poems-section {
-  background: var(--bg-primary);
-}
-
-.dark-theme .topics-section,
-.dark-theme .popular-poets-section {
-  background: var(--bg-secondary);
-}
-
-.dark-theme .topic-card,
-.dark-theme .poem-card,
-.dark-theme .poet-card {
-  background: var(--bg-card);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-.dark-theme .topic-card:hover,
-.dark-theme .poem-card:hover {
-  border-color: var(--accent-color);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-
-.dark-theme .topic-title,
-.dark-theme .poem-card-title,
-.dark-theme .poet-name,
-.dark-theme .poem-title {
-  color: var(--text-primary);
-}
-
-.dark-theme .topic-description,
-.dark-theme .poem-card-author,
-.dark-theme .poet-dynasty,
-.dark-theme .poem-card-excerpt,
-.dark-theme .poet-bio,
-.dark-theme .poem-author {
+.dark-theme .error-container p {
   color: var(--text-secondary);
-}
-
-.dark-theme .topic-count {
-  color: var(--accent-color);
-}
-
-.dark-theme .tag {
-  background: var(--bg-secondary);
-  color: var(--accent-color);
-}
-
-.dark-theme .daily-poem-card {
-  background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-hover) 100%);
-}
-
-.dark-theme .read-more-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
-  color: var(--text-primary);
-}
-
-.dark-theme .read-more-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.dark-theme .search-input {
-  background: var(--bg-card);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-}
-
-.dark-theme .search-input::placeholder {
-  color: var(--text-secondary);
-}
-
-.dark-theme .search-button {
-  background: var(--accent-color);
-  color: var(--text-primary);
-}
-
-.dark-theme .search-button:hover {
-  background: var(--accent-hover);
-}
-
-.dark-theme .poet-avatar {
-  background: var(--accent-color);
-  color: var(--text-primary);
 }
 </style>

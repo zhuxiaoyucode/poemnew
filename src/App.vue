@@ -3,12 +3,15 @@ import { RouterView } from 'vue-router'
 import AppHeader from '@/components/common/AppHeader.vue'
 import AppFooter from '@/components/common/AppFooter.vue'
 import { useThemeStore } from '@/stores/theme'
+import { useUserStore } from '@/stores/user'
 import { onMounted } from 'vue'
 
 const themeStore = useThemeStore()
+const userStore = useUserStore()
 
 onMounted(() => {
   themeStore.initTheme()
+  userStore.initUser()
 })
 </script>
 
@@ -33,23 +36,20 @@ body {
   font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
   line-height: 1.6;
   color: #2c3e50;
-  background-color: #f8f9fa;
+  background-color: #ffffff;
 }
 
 .app {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  align-items: center;
 }
 
 .main-content {
   flex: 1;
   padding-top: 80px; /* 为固定头部留出空间 */
+  min-height: calc(100vh - 80px);
   width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
 }
 
 /* 全局样式 */
@@ -75,22 +75,37 @@ body {
 }
 
 .btn-primary {
-  background: #667eea;
+  background: #8b5a2b;
   color: white;
+  padding: 1rem 2rem;
+  border: none;
+  border-radius: 2rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
 .btn-primary:hover {
-  background: #5a6fd8;
-  transform: translateY(-1px);
+  background: #7a4a1f;
+  transform: translateY(-2px);
 }
 
 .btn-secondary {
-  background: #e9ecef;
-  color: #495057;
+  background: white;
+  color: #8b5a2b;
+  padding: 1rem 2rem;
+  border: 2px solid #8b5a2b;
+  border-radius: 2rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
 .btn-secondary:hover {
-  background: #dee2e6;
+  background: #8b5a2b;
+  color: white;
 }
 
 .card {
@@ -105,7 +120,7 @@ body {
   .container {
     padding: 0 16px;
   }
-  
+
   .btn {
     padding: 10px 20px;
     font-size: 16px;

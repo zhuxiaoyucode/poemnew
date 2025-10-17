@@ -64,7 +64,18 @@ const loadTopicData = async () => {
       const poet = poetryStore.poets.find((p) => p.id === poem.poetId)
       return {
         ...poem,
-        poet: poet || null,
+        poet: poet
+          ? {
+              id: poet.id,
+              name: poet.name,
+              dynasty: poet.dynasty,
+              birthYear: poet.birthYear,
+              deathYear: poet.deathYear,
+              biography: poet.biography,
+              avatar: poet.avatar,
+              tags: poet.tags,
+            }
+          : undefined,
       }
     })
     currentTopic.value.count = topicPoems.value.length
@@ -132,14 +143,15 @@ const backToHome = () => {
 <style scoped>
 .topic-view {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  padding: 40px 0;
+  background: #f8f9fa;
+  padding: 2rem 0;
 }
 
 .container {
-  max-width: 1200px;
+  width: 100%;
+  max-width: none;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 2rem;
 }
 
 /* Topic Header */

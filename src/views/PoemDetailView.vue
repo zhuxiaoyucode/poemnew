@@ -25,13 +25,16 @@ onMounted(async () => {
 })
 
 const loadPoemData = async () => {
-  const foundPoem = poetryStore.getPoemById(poemId.value)
+  const foundPoem = await poetryStore.getPoemById(poemId.value)
   if (foundPoem) {
     poem.value = foundPoem
-    relatedPoems.value = poetryStore.getRelatedPoems(foundPoem)
-    
+    const related = await poetryStore.getRelatedPoems(foundPoem)
+    relatedPoems.value = related
+
     // 自动开始AI对话
     aiStore.startNewConversation(poemId.value, `关于《${foundPoem.title}》的探讨`)
+  } else {
+    console.error('未找到诗歌数据，ID:', poemId.value)
   }
 }
 
@@ -41,7 +44,7 @@ const toggleAIChat = () => {
 
 const askAIQuestion = async () => {
   if (!userQuestion.value.trim()) return
-  
+
   await aiStore.sendMessage(userQuestion.value, 'question')
   userQuestion.value = ''
 }
@@ -79,7 +82,7 @@ const sharePoem = () => {
             <span class="dynasty">{{ poem.dynasty }}</span>
           </div>
         </div>
-        
+
         <div class="action-buttons">
           <button @click="playAudio" class="audio-btn" :disabled="!poem.audioUrl">
             <span v-if="isPlayingAudio">⏹️</span>
@@ -88,9 +91,7 @@ const sharePoem = () => {
           </button>
           <button @click="likePoem" class="like-btn">❤️ 喜欢</button>
           <button @click="sharePoem" class="share-btn">📤 分享</button>
-          <button @click="toggleAIChat" class="ai-chat-btn">
-            🤖 与AI探讨
-          </button>
+          <button @click="toggleAIChat" class="ai-chat-btn">🤖 与AI探讨</button>
         </div>
       </section>
 
@@ -99,12 +100,12 @@ const sharePoem = () => {
         <div class="poem-text">
           <pre>{{ poem.content }}</pre>
         </div>
-        
+
         <div v-if="poem.translation" class="translation">
           <h3>译文</h3>
           <p>{{ poem.translation }}</p>
         </div>
-        
+
         <div v-if="poem.background" class="background">
           <h3>创作背景</h3>
           <p>{{ poem.background }}</p>
@@ -115,11 +116,7 @@ const sharePoem = () => {
       <section class="poem-tags">
         <h3>标签</h3>
         <div class="tags-container">
-          <span
-            v-for="tag in poem.tags"
-            :key="tag"
-            class="tag"
-          >
+          <span v-for="tag in poem.tags" :key="tag" class="tag">
             {{ tag }}
           </span>
         </div>
@@ -143,7 +140,7 @@ const sharePoem = () => {
               </div>
             </div>
           </div>
-          
+
           <div class="chat-input">
             <input
               v-model="userQuestion"
@@ -161,11 +158,7 @@ const sharePoem = () => {
       <section class="related-poems">
         <h3>相关诗作</h3>
         <div class="related-grid">
-          <div
-            v-for="relatedPoem in relatedPoems"
-            :key="relatedPoem.id"
-            class="related-poem-card"
-          >
+          <div v-for="relatedPoem in relatedPoems" :key="relatedPoem.id" class="related-poem-card">
             <h4>{{ relatedPoem.title }}</h4>
             <p>{{ relatedPoem.poet?.name }} · {{ relatedPoem.dynasty }}</p>
             <p class="excerpt">{{ relatedPoem.content.substring(0, 40) }}...</p>
@@ -174,7 +167,7 @@ const sharePoem = () => {
       </section>
     </div>
   </div>
-  
+
   <div v-else class="loading">
     <p>加载中...</p>
   </div>
@@ -183,14 +176,15 @@ const sharePoem = () => {
 <style scoped>
 .poem-detail-view {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  padding: 40px 0;
+  background: var(--bg-primary);
+  padding: 2rem 0;
 }
 
 .container {
-  max-width: 1000px;
+  width: 100%;
+  max-width: none;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 2rem;
 }
 
 /* Poem Header */
@@ -279,18 +273,21 @@ const sharePoem = () => {
   margin-bottom: 30px;
 }
 
-.translation, .background {
+.translation,
+.background {
   margin-top: 30px;
   padding-top: 20px;
   border-top: 1px solid #eee;
 }
 
-.translation h3, .background h3 {
+.translation h3,
+.background h3 {
   color: #2c3e50;
   margin-bottom: 12px;
 }
 
-.translation p, .background p {
+.translation p,
+.background p {
   line-height: 1.6;
   color: #555;
 }
@@ -433,15 +430,15 @@ const sharePoem = () => {
     flex-direction: column;
     gap: 20px;
   }
-  
+
   .poem-title {
     font-size: 2rem;
   }
-  
+
   .action-buttons {
     justify-content: center;
   }
-  
+
   .related-grid {
     grid-template-columns: 1fr;
   }

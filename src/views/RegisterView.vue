@@ -34,10 +34,24 @@ const handleRegister = async () => {
 
   try {
     // 使用用户存储的注册方法
-    await userStore.register(username.value, email.value, password.value)
-    router.push('/')
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '注册失败，请稍后重试'
+    const success = await userStore.register(username.value, email.value, password.value)
+    if (success) {
+      router.push('/')
+    } else {
+      errorMessage.value = '注册失败，用户名或邮箱已存在'
+    }
+  } catch (error: any) {
+    console.error('注册错误详情:', error)
+    errorMessage.value = error.message || '注册失败，请稍后重试'
+
+    // 如果是数据库表不存在，提供具体指导
+    if (
+      error.message &&
+      error.message.includes('relation') &&
+      error.message.includes('does not exist')
+    ) {
+      errorMessage.value = '数据库表不存在，请先在Supabase控制台执行SQL脚本创建表'
+    }
   } finally {
     isLoading.value = false
   }
@@ -134,16 +148,17 @@ const goToHome = () => {
 <style scoped>
 .register-view {
   min-height: 100vh;
-  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  background: #f8f9fa;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px;
+  padding: 2rem;
 }
 
 .container {
   width: 100%;
   max-width: 400px;
+  padding: 0 2rem;
 }
 
 .register-card {

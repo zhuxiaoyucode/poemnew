@@ -4,25 +4,15 @@ import { ref } from 'vue'
 export const useThemeStore = defineStore('theme', () => {
   const currentTheme = ref<'light' | 'dark' | 'auto'>('light')
 
-  // 初始化主题
-  const initTheme = () => {
-    const savedTheme = localStorage.getItem('poetry-theme')
-    if (savedTheme) {
-      currentTheme.value = savedTheme as 'light' | 'dark' | 'auto'
-    } else {
-      // 检查系统偏好
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-      if (prefersDark) {
-        currentTheme.value = 'auto'
-      }
-    }
-    applyTheme()
-  }
-
   // 应用主题
   const applyTheme = () => {
+    // 确保DOM已完全加载
+    if (typeof document === 'undefined' || !document.documentElement) {
+      return
+    }
+
     let themeToApply = currentTheme.value
-    
+
     if (themeToApply === 'auto') {
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
       themeToApply = prefersDark ? 'dark' : 'light'
@@ -38,6 +28,27 @@ export const useThemeStore = defineStore('theme', () => {
     }
   }
 
+  // 初始化主题
+  const initTheme = () => {
+    const savedTheme = localStorage.getItem('poetry-theme')
+    if (savedTheme) {
+      currentTheme.value = savedTheme as 'light' | 'dark' | 'auto'
+    } else {
+      // 检查系统偏好
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      if (prefersDark) {
+        currentTheme.value = 'auto'
+      }
+    }
+
+    // 延迟应用主题，确保DOM已加载
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', applyTheme)
+    } else {
+      applyTheme()
+    }
+  }
+
   // 切换主题
   const setTheme = (theme: 'light' | 'dark' | 'auto') => {
     currentTheme.value = theme
@@ -49,7 +60,8 @@ export const useThemeStore = defineStore('theme', () => {
   const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
   mediaQuery.addEventListener('change', () => {
     if (currentTheme.value === 'auto') {
-      applyTheme()
+      // 延迟应用主题，确保DOM已加载
+      setTimeout(applyTheme, 0)
     }
   })
 
@@ -57,6 +69,6 @@ export const useThemeStore = defineStore('theme', () => {
     currentTheme,
     initTheme,
     setTheme,
-    applyTheme
+    applyTheme,
   }
 })

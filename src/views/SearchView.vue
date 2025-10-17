@@ -1,9 +1,18 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePoetryStore } from '@/stores/poetry'
 import { useUserStore } from '@/stores/user'
 import type { Poem, PoetrySearchParams } from '@/types/poetry'
+
+// 简单的防抖函数
+const debounce = (func: Function, delay: number) => {
+  let timeoutId: NodeJS.Timeout
+  return (...args: any[]) => {
+    clearTimeout(timeoutId)
+    timeoutId = setTimeout(() => func.apply(null, args), delay)
+  }
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -15,6 +24,20 @@ const searchResults = ref<Poem[]>([])
 const activeFilter = ref('all') // all, poems, poets
 const isLoading = ref(false)
 const hasSearched = ref(false)
+const searchCache = new Map<string, Poem[]>() // 搜索缓存
+
+// 使用计算属性缓存过滤结果，避免重复计算和渲染
+const filteredResults = computed(() => {
+  if (activeFilter.value === 'all') {
+    return searchResults.value
+  } else if (activeFilter.value === 'poets') {
+    // 诗人筛选：直接使用诗歌中的诗人信息进行筛选
+    return searchResults.value.filter((poem) => {
+      return poem.poet?.name.toLowerCase().includes(searchQuery.value.toLowerCase())
+    })
+  }
+  return searchResults.value
+})
 
 const searchFilters = [
   { value: 'all', label: '全部' },
@@ -29,6 +52,9 @@ onMounted(() => {
   if (route.query.q) {
     searchQuery.value = route.query.q as string
     performSearch()
+  } else if (route.query.showAll === 'true') {
+    // 显示所有诗歌
+    showAllPoems()
   }
 })
 
@@ -42,10 +68,34 @@ watch(
   },
 )
 
-const performSearch = async () => {
-  if (!searchQuery.value.trim()) {
+// 监听搜索输入，实现实时搜索
+watch(searchQuery, (newQuery) => {
+  if (newQuery && newQuery.length > 2) {
+    debouncedSearch(newQuery)
+  } else if (newQuery.length === 0) {
     searchResults.value = []
     hasSearched.value = false
+  }
+})
+
+const performSearch = async (query?: string) => {
+  const searchTerm = query || searchQuery.value
+
+  if (!searchTerm.trim()) {
+    searchResults.value = []
+    hasSearched.value = false
+    return
+  }
+
+  // 检查缓存 - 使用完整的搜索参数作为缓存键
+  const cacheKey = JSON.stringify({
+    query: searchTerm,
+    filter: activeFilter.value,
+    timestamp: Date.now(), // 添加时间戳避免永久缓存
+  })
+  if (searchCache.has(cacheKey)) {
+    searchResults.value = searchCache.get(cacheKey)!
+    hasSearched.value = true
     return
   }
 
@@ -53,28 +103,34 @@ const performSearch = async () => {
   hasSearched.value = true
 
   try {
-    const params: PoetrySearchParams = { query: searchQuery.value }
+    const params: PoetrySearchParams = { query: searchTerm }
 
     // 根据筛选条件调整搜索参数
     if (activeFilter.value === 'poets') {
-      // 搜索诗人时，通过诗人姓名查找对应的诗人ID
-      const matchedPoet = poetryStore.poets.find((poet) =>
-        poet.name.toLowerCase().includes(searchQuery.value.toLowerCase()),
-      )
-      if (matchedPoet) {
-        params.poet = matchedPoet.id
-      }
+      // 搜索诗人时，直接使用搜索条件，store中已处理诗人姓名搜索
+      params.query = searchTerm
     }
 
-    await poetryStore.searchPoems(params)
-    searchResults.value = poetryStore.searchResults
+    const results = await poetryStore.searchPoems(params)
+    searchResults.value = results || []
+
+    // 缓存结果 - 设置合理的缓存大小限制
+    if (searchCache.size > 50) {
+      // 删除最旧的缓存项
+      const firstKey = searchCache.keys().next().value
+      searchCache.delete(firstKey)
+    }
+    searchCache.set(cacheKey, searchResults.value)
 
     // 记录搜索活动
-    userStore.recordActivity(`search:${searchQuery.value}`, 'view')
+    userStore.recordActivity(`search:${searchTerm}`, 'view')
   } finally {
     isLoading.value = false
   }
 }
+
+// 创建防抖搜索函数
+const debouncedSearch = debounce(performSearch, 300)
 
 const handleSearch = () => {
   // 更新URL参数并执行搜索
@@ -107,17 +163,52 @@ const viewPoet = (poetName: string) => {
   router.push({ name: 'poet', params: { id: poetName } })
 }
 
-const getFilteredResults = () => {
-  if (activeFilter.value === 'all') {
-    return searchResults.value
-  } else if (activeFilter.value === 'poets') {
-    // 诗人筛选：显示与搜索关键词匹配的诗人作品
-    return searchResults.value.filter((poem) => {
-      const poet = poetryStore.poets.find((p) => p.id === poem.poetId)
-      return poet && poet.name.toLowerCase().includes(searchQuery.value.toLowerCase())
+const showAllPoems = async () => {
+  isLoading.value = true
+  hasSearched.value = true
+  searchQuery.value = ''
+
+  try {
+    // 检查缓存 - 使用完整的缓存键
+    const cacheKey = JSON.stringify({
+      query: 'all_poems',
+      filter: 'all',
+      timestamp: Date.now(),
     })
+    if (searchCache.has(cacheKey)) {
+      searchResults.value = searchCache.get(cacheKey)!
+      isLoading.value = false
+      return
+    }
+
+    // 直接使用store中已有的数据，避免重复加载
+    console.log('store中诗歌数量:', poetryStore.poems.length)
+
+    // 简化的去重逻辑 - 使用Set基于ID去重
+    const uniquePoems = new Map<string, Poem>()
+
+    poetryStore.poems.forEach((poem) => {
+      if (!uniquePoems.has(poem.id)) {
+        uniquePoems.set(poem.id, poem)
+      }
+    })
+
+    const result = Array.from(uniquePoems.values())
+    console.log('去重后诗歌数量:', result.length)
+
+    // 缓存结果 - 使用一致的缓存键格式
+    if (searchCache.size > 50) {
+      const firstKey = searchCache.keys().next().value
+      searchCache.delete(firstKey)
+    }
+    searchCache.set(cacheKey, result)
+    searchResults.value = result
+  } catch (error) {
+    console.error('获取所有诗歌失败:', error)
+    searchResults.value = []
+  } finally {
+    isLoading.value = false
   }
-  return searchResults.value
 }
 </script>
 
@@ -125,7 +216,7 @@ const getFilteredResults = () => {
   <div class="search-view">
     <div class="container">
       <!-- 搜索框 -->
-      <section class="search-section">
+      <section v-if="!route.query.showAll" class="search-section">
         <div class="search-header">
           <h1>搜索诗词</h1>
           <p>探索中华诗词的博大精深</p>
@@ -161,7 +252,7 @@ const getFilteredResults = () => {
       </section>
 
       <!-- 热门标签 -->
-      <section v-if="!hasSearched" class="popular-tags">
+      <section v-if="!hasSearched && !route.query.showAll" class="popular-tags">
         <h3>热门标签</h3>
         <div class="tags-container">
           <button
@@ -178,21 +269,24 @@ const getFilteredResults = () => {
       <!-- 搜索结果 -->
       <section v-if="hasSearched" class="results-section">
         <div class="results-header">
-          <h2>搜索结果</h2>
-          <span class="results-count"> 找到 {{ getFilteredResults().length }} 个结果 </span>
+          <h2>{{ route.query.showAll === 'true' ? '所有诗歌' : '搜索结果' }}</h2>
+          <span class="results-count">
+            {{ route.query.showAll === 'true' ? '共' : '找到' }} {{ filteredResults.length }}
+            {{ route.query.showAll === 'true' ? '首诗歌' : '个结果' }}
+          </span>
         </div>
 
         <div v-if="isLoading" class="loading">
           <p>搜索中...</p>
         </div>
 
-        <div v-else-if="getFilteredResults().length === 0" class="no-results">
+        <div v-else-if="filteredResults.length === 0" class="no-results">
           <p>没有找到相关结果，请尝试其他关键词</p>
         </div>
 
         <div v-else class="results-grid">
           <div
-            v-for="poem in getFilteredResults()"
+            v-for="poem in filteredResults"
             :key="poem.id"
             class="result-card"
             @click="viewPoem(poem.id)"
@@ -211,16 +305,12 @@ const getFilteredResults = () => {
         </div>
 
         <!-- 相关诗人推荐 -->
-        <div v-if="getFilteredResults().length > 0" class="related-poets">
+        <div v-if="filteredResults.length > 0" class="related-poets">
           <h3>相关诗人</h3>
           <div class="poets-list">
             <div
               v-for="poet in Array.from(
-                new Set(
-                  getFilteredResults()
-                    .map((p) => p.poet?.name)
-                    .filter(Boolean),
-                ),
+                new Set(filteredResults.map((p) => p.poet?.name).filter(Boolean)),
               )"
               :key="poet"
               class="poet-item"
@@ -238,14 +328,15 @@ const getFilteredResults = () => {
 <style scoped>
 .search-view {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  padding: 40px 0;
+  background: #f8f9fa;
+  padding: 2rem 0;
 }
 
 .container {
-  max-width: 1000px;
+  width: 100%;
+  max-width: none;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 2rem;
 }
 
 /* 搜索区域 */

@@ -1,301 +1,44 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Poem, Poet, PoetrySearchParams } from '@/types/poetry'
+import { supabase } from '@/services/supabase'
 
-// 模拟数据 - 实际项目中应该从API获取
-const mockPoets: Poet[] = [
-  {
-    id: '1',
-    name: '李白',
-    dynasty: '唐',
-    biography: '唐代伟大的浪漫主义诗人，被后人誉为"诗仙"。',
-    tags: ['浪漫主义', '豪放', '山水'],
-  },
-  {
-    id: '2',
-    name: '杜甫',
-    dynasty: '唐',
-    biography: '唐代伟大的现实主义诗人，被后人誉为"诗圣"。',
-    tags: ['现实主义', '沉郁', '社会'],
-  },
-  {
-    id: '3',
-    name: '王维',
-    dynasty: '唐',
-    biography: '唐代著名诗人、画家，被誉为"诗佛"。',
-    tags: ['山水', '田园', '禅意'],
-  },
-  {
-    id: '4',
-    name: '王之涣',
-    dynasty: '唐',
-    biography: '唐代边塞诗人，以《登鹳雀楼》闻名。',
-    tags: ['边塞', '豪放', '壮丽'],
-  },
-  {
-    id: '5',
-    name: '孟浩然',
-    dynasty: '唐',
-    biography: '唐代山水田园诗人，与王维并称"王孟"。',
-    tags: ['山水', '田园', '自然'],
-  },
-  {
-    id: '6',
-    name: '王昌龄',
-    dynasty: '唐',
-    biography: '唐代边塞诗人，被誉为"七绝圣手"。',
-    tags: ['边塞', '战争', '豪情'],
-  },
-  {
-    id: '7',
-    name: '李商隐',
-    dynasty: '唐',
-    biography: '晚唐著名诗人，以无题诗和爱情诗著称。',
-    tags: ['爱情', '隐晦', '唯美'],
-  },
-  {
-    id: '8',
-    name: '杜牧',
-    dynasty: '唐',
-    biography: '晚唐诗人，与李商隐并称"小李杜"。',
-    tags: ['咏史', '抒情', '豪放'],
-  },
-]
+// 诗歌类型定义
+export interface PoemType {
+  id: number
+  name: string
+  description: string
+  count: number
+  color: string
+}
 
-const mockPoems: Poem[] = [
-  // 李白诗作
-  {
-    id: '1',
-    title: '静夜思',
-    content: '床前明月光，疑是地上霜。举头望明月，低头思故乡。',
-    poetId: '1',
-    dynasty: '唐',
-    tags: ['思乡', '月亮', '夜晚'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '17',
-    title: '望庐山瀑布',
-    content: '日照香炉生紫烟，遥看瀑布挂前川。飞流直下三千尺，疑是银河落九天。',
-    poetId: '1',
-    dynasty: '唐',
-    tags: ['山水', '壮丽', '自然'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '18',
-    title: '早发白帝城',
-    content: '朝辞白帝彩云间，千里江陵一日还。两岸猿声啼不住，轻舟已过万重山。',
-    poetId: '1',
-    dynasty: '唐',
-    tags: ['旅行', '山水', '豪放'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '19',
-    title: '赠汪伦',
-    content: '李白乘舟将欲行，忽闻岸上踏歌声。桃花潭水深千尺，不及汪伦送我情。',
-    poetId: '1',
-    dynasty: '唐',
-    tags: ['友情', '离别', '抒情'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-
-  // 杜甫诗作
-  {
-    id: '2',
-    title: '春望',
-    content: '国破山河在，城春草木深。感时花溅泪，恨别鸟惊心。',
-    poetId: '2',
-    dynasty: '唐',
-    tags: ['爱国', '战争', '春天'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '20',
-    title: '春夜喜雨',
-    content: '好雨知时节，当春乃发生。随风潜入夜，润物细无声。',
-    poetId: '2',
-    dynasty: '唐',
-    tags: ['春天', '自然', '喜悦'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '21',
-    title: '登高',
-    content: '风急天高猿啸哀，渚清沙白鸟飞回。无边落木萧萧下，不尽长江滚滚来。',
-    poetId: '2',
-    dynasty: '唐',
-    tags: ['秋天', '登高', '感怀'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '22',
-    title: '绝句',
-    content: '两个黄鹂鸣翠柳，一行白鹭上青天。窗含西岭千秋雪，门泊东吴万里船。',
-    poetId: '2',
-    dynasty: '唐',
-    tags: ['春天', '自然', '写景'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '3',
-    title: '登鹳雀楼',
-    content: '白日依山尽，黄河入海流。欲穷千里目，更上一层楼。',
-    poetId: '4',
-    dynasty: '唐',
-    tags: ['边塞', '壮丽', '哲理'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '4',
-    title: '出塞',
-    content: '秦时明月汉时关，万里长征人未还。但使龙城飞将在，不教胡马度阴山。',
-    poetId: '6',
-    dynasty: '唐',
-    tags: ['边塞', '战争', '爱国'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '5',
-    title: '凉州词',
-    content: '黄河远上白云间，一片孤城万仞山。羌笛何须怨杨柳，春风不度玉门关。',
-    poetId: '4',
-    dynasty: '唐',
-    tags: ['边塞', '壮丽', '思乡'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '6',
-    title: '从军行',
-    content: '青海长云暗雪山，孤城遥望玉门关。黄沙百战穿金甲，不破楼兰终不还。',
-    poetId: '6',
-    dynasty: '唐',
-    tags: ['边塞', '战争', '豪情'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-
-  // 山水田园诗
-  {
-    id: '7',
-    title: '山居秋暝',
-    content: '空山新雨后，天气晚来秋。明月松间照，清泉石上流。',
-    poetId: '3',
-    dynasty: '唐',
-    tags: ['山水', '田园', '自然'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '8',
-    title: '过故人庄',
-    content: '故人具鸡黍，邀我至田家。绿树村边合，青山郭外斜。',
-    poetId: '5',
-    dynasty: '唐',
-    tags: ['田园', '友情', '自然'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '9',
-    title: '鹿柴',
-    content: '空山不见人，但闻人语响。返景入深林，复照青苔上。',
-    poetId: '3',
-    dynasty: '唐',
-    tags: ['山水', '禅意', '宁静'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '10',
-    title: '春晓',
-    content: '春眠不觉晓，处处闻啼鸟。夜来风雨声，花落知多少。',
-    poetId: '5',
-    dynasty: '唐',
-    tags: ['春天', '自然', '田园'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '11',
-    title: '鸟鸣涧',
-    content: '人闲桂花落，夜静春山空。月出惊山鸟，时鸣春涧中。',
-    poetId: '3',
-    dynasty: '唐',
-    tags: ['山水', '宁静', '自然'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-
-  // 思乡怀人诗
-  {
-    id: '12',
-    title: '九月九日忆山东兄弟',
-    content: '独在异乡为异客，每逢佳节倍思亲。遥知兄弟登高处，遍插茱萸少一人。',
-    poetId: '3',
-    dynasty: '唐',
-    tags: ['思乡', '怀人', '节日'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '13',
-    title: '夜雨寄北',
-    content: '君问归期未有期，巴山夜雨涨秋池。何当共剪西窗烛，却话巴山夜雨时。',
-    poetId: '7',
-    dynasty: '唐',
-    tags: ['思乡', '爱情', '离别'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '14',
-    title: '望月怀远',
-    content: '海上生明月，天涯共此时。情人怨遥夜，竟夕起相思。',
-    poetId: '5',
-    dynasty: '唐',
-    tags: ['思乡', '月亮', '怀人'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '15',
-    title: '秋思',
-    content: '洛阳城里见秋风，欲作家书意万重。复恐匆匆说不尽，行人临发又开封。',
-    poetId: '8',
-    dynasty: '唐',
-    tags: ['思乡', '秋天', '离别'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '16',
-    title: '无题',
-    content: '相见时难别亦难，东风无力百花残。春蚕到死丝方尽，蜡炬成灰泪始干。',
-    poetId: '7',
-    dynasty: '唐',
-    tags: ['爱情', '离别', '思念'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-]
+// 从数据库获取的诗歌类型（已注释，因为使用动态获取）
+// const poemTypes: PoemType[] = [
+//   { id: 1, name: '思乡诗', description: '表达对故乡、亲人的思念之情', count: 0, color: '#8b5a2b' },
+//   { id: 2, name: '山水诗', description: '描写自然山水风光', count: 0, color: '#4a90e2' },
+//   { id: 3, name: '记行诗', description: '记录旅行见闻和感受', count: 0, color: '#f5a623' },
+//   { id: 4, name: '送别诗', description: '表达离别之情', count: 0, color: '#d0021b' },
+//   { id: 5, name: '抒情诗', description: '抒发个人情感', count: 0, color: '#7ed321' },
+//   { id: 6, name: '咏物诗', description: '通过描写事物表达情感', count: 0, color: '#bd10e0' },
+//   { id: 7, name: '爱国诗', description: '表达爱国情怀', count: 0, color: '#ff6b6b' },
+//   { id: 8, name: '田园诗', description: '描写田园生活和自然风光', count: 0, color: '#4ecdc4' },
+//   { id: 9, name: '怀古诗', description: '怀念历史人物或事件', count: 0, color: '#45b7d1' },
+//   { id: 10, name: '爱情诗', description: '表达爱情情感', count: 0, color: '#ff9ff3' },
+//   { id: 11, name: '酬赠诗', description: '朋友间的赠答诗', count: 0, color: '#54a0ff' },
+//   { id: 12, name: '边塞诗', description: '描写边塞生活和战争', count: 0, color: '#ff9f43' },
+//   { id: 13, name: '叙事诗', description: '叙述故事或事件', count: 0, color: '#a55eea' },
+//   { id: 14, name: '讽喻诗', description: '通过讽刺表达观点', count: 0, color: '#fd9644' },
+//   { id: 15, name: '亲情诗', description: '表达亲情', count: 0, color: '#26de81' },
+//   { id: 16, name: '哲理诗', description: '蕴含人生哲理', count: 0, color: '#2bcbba' },
+//   { id: 17, name: '节日诗', description: '描写节日习俗和情感', count: 0, color: '#ff7f50' },
+//   { id: 18, name: '咏史怀古', description: '咏史怀古类诗歌', count: 0, color: '#778beb' },
+// ]
 
 export const usePoetryStore = defineStore('poetry', () => {
   // 状态
-  const poems = ref<Poem[]>(mockPoems)
-  const poets = ref<Poet[]>(mockPoets)
+  const poems = ref<Poem[]>([])
+  const poets = ref<Poet[]>([])
+  const poemTypes = ref<PoemType[]>([])
   const currentPoem = ref<Poem | null>(null)
   const currentPoet = ref<Poet | null>(null)
   const searchResults = ref<Poem[]>([])
@@ -304,85 +47,415 @@ export const usePoetryStore = defineStore('poetry', () => {
   // Getter
   const featuredPoems = computed(() => poems.value.slice(0, 5))
   const popularPoets = computed(() => poets.value.slice(0, 3))
+  const categories = computed(() => poemTypes.value)
 
   // Actions
-  const searchPoems = async (params: PoetrySearchParams) => {
+  const fetchPoemTypes = async () => {
+    try {
+      const { data, error } = await supabase.from('poem_types').select('*')
+
+      if (error) throw error
+
+      // 获取所有诗歌数据用于统计数量
+      const { data: allPoems, error: poemsError } = await supabase.from('poems').select('*')
+
+      if (poemsError) throw poemsError
+
+      // 获取每个类型的诗歌数量
+      const typesWithCount = data.map((type: any) => {
+        const count = allPoems ? allPoems.filter((poem: any) => poem.type_id === type.id).length : 0
+
+        return {
+          id: type.id,
+          name: type.name,
+          description: type.description,
+          count: count,
+          color: getTypeColor(type.name),
+        }
+      })
+
+      // 按名称排序
+      typesWithCount.sort((a, b) => a.name.localeCompare(b.name))
+
+      poemTypes.value = typesWithCount
+      return typesWithCount
+    } catch (error) {
+      console.error('获取诗歌类型失败:', error)
+      return []
+    }
+  }
+
+  const fetchPoemsByType = async (typeId: number) => {
     isLoading.value = true
     try {
-      // 模拟搜索延迟
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      console.log(`开始查询类型ID: ${typeId}的诗歌`)
 
-      let results = poems.value
+      // 获取所有类型数据
+      const { data: allTypes, error: typesError } = await supabase.from('poem_types').select('*')
 
-      if (params.query) {
-        const query = params.query.toLowerCase()
-        results = results.filter(
-          (poem) =>
-            poem.title.toLowerCase().includes(query) ||
-            poem.content.toLowerCase().includes(query) ||
-            // 通过诗人姓名搜索
-            poets.value.some(
-              (poet) => poet.id === poem.poetId && poet.name.toLowerCase().includes(query),
-            ) ||
-            // 通过标签搜索
-            poem.tags.some((tag) => tag.toLowerCase().includes(query)),
-        )
+      if (typesError) {
+        console.error('获取类型数据错误:', typesError)
+        throw typesError
       }
 
-      if (params.poet) {
-        results = results.filter((poem) => poem.poetId === params.poet)
+      // 在客户端查找类型名称
+      const typeData = allTypes?.find((type: any) => type.id === typeId)
+
+      if (!typeData) {
+        console.error('未找到对应的诗歌类型')
+        return []
       }
 
-      if (params.dynasty) {
-        results = results.filter((poem) => poem.dynasty === params.dynasty)
+      console.log(`类型名称: ${typeData.name}`)
+
+      // 获取所有诗歌数据
+      const { data, error } = await supabase.from('poetry_view').select('*')
+
+      if (error) {
+        console.error('查询错误:', error)
+        throw error
       }
 
-      if (params.tags && params.tags.length > 0) {
-        // 专题搜索：诗词必须包含至少一个指定的标签
-        results = results.filter((poem) => params.tags!.some((tag) => poem.tags.includes(tag)))
-      }
+      // 在客户端过滤对应类型的诗歌
+      const filteredData = data?.filter((item: any) => item.poem_type === typeData.name) || []
 
-      searchResults.value = results
-      return results
+      console.log(`查询结果:`, filteredData)
+
+      // 按标题排序
+      const sortedData = filteredData.sort((a: any, b: any) => a.title.localeCompare(b.title))
+
+      const poemsData = sortedData.map((item: any) => ({
+        id: item.id.toString(),
+        title: item.title,
+        content: item.content,
+        poetId: `poet_${item.poet_name}_${item.dynasty_name}`.replace(/\s+/g, '_'),
+        poet: {
+          id: `poet_${item.poet_name}_${item.dynasty_name}`.replace(/\s+/g, '_'),
+          name: item.poet_name,
+          dynasty: item.dynasty_name,
+          biography: item.poet_description || '',
+          tags: [],
+        },
+        dynasty: item.dynasty_name,
+        tags: [item.poem_type],
+        createdAt: new Date(item.created_at),
+        updatedAt: new Date(item.created_at),
+      }))
+
+      console.log(`获取到类型"${typeData.name}"的诗歌: ${poemsData.length}首`)
+      return poemsData
+    } catch (error) {
+      console.error('获取诗歌失败:', error)
+      return []
     } finally {
       isLoading.value = false
     }
   }
 
-  const getPoemById = (id: string) => {
-    const poem = poems.value.find((p) => p.id === id)
-    if (poem) {
-      // 关联诗人信息
-      const poet = poets.value.find((p) => p.id === poem.poetId)
-      currentPoem.value = {
-        ...poem,
-        poet: poet || null,
-      }
-      if (poet) {
-        currentPoet.value = poet
-      }
+  const fetchAllPoems = async () => {
+    isLoading.value = true
+    try {
+      const { data, error } = await supabase.from('poetry_view').select('*').order('title')
+
+      if (error) throw error
+
+      const poemsData =
+        data?.map((item: any) => ({
+          id: item.id.toString(),
+          title: item.title,
+          content: item.content,
+          poetId: `poet_${item.poet_name}_${item.dynasty_name}`.replace(/\s+/g, '_'),
+          poet: {
+            id: `poet_${item.poet_name}_${item.dynasty_name}`.replace(/\s+/g, '_'),
+            name: item.poet_name,
+            dynasty: item.dynasty_name,
+            biography: item.poet_description || '',
+            tags: [],
+          },
+          dynasty: item.dynasty_name,
+          tags: [item.poem_type],
+          createdAt: new Date(item.created_at),
+          updatedAt: new Date(item.created_at),
+        })) || []
+
+      poems.value = poemsData
+      return poemsData
+    } catch (error) {
+      console.error('获取诗歌失败:', error)
+      return []
+    } finally {
+      isLoading.value = false
     }
-    return currentPoem.value
   }
 
-  const getPoetById = (id: string) => {
-    const poet = poets.value.find((p) => p.id === id)
-    if (poet) {
-      currentPoet.value = poet
+  const searchPoems = async (params: PoetrySearchParams) => {
+    isLoading.value = true
+    try {
+      console.log('开始搜索，参数:', params)
+
+      // 参数验证和类型安全
+      if (!params || (typeof params !== 'object')) {
+        console.error('搜索参数无效')
+        return []
+      }
+
+      let query = supabase.from('poetry_view').select('*')
+
+      // 构建查询条件
+      if (params.query && typeof params.query === 'string') {
+        const searchQuery = params.query.toLowerCase()
+        // 使用Supabase的查询构建器进行多字段搜索
+        query = query.or(
+          `title.ilike.%${searchQuery}%,content.ilike.%${searchQuery}%,poet_name.ilike.%${searchQuery}%`,
+        )
+      }
+
+      if (params.poet && typeof params.poet === 'string') {
+        query = query.eq('poet_name', params.poet)
+      }
+
+      if (params.dynasty && typeof params.dynasty === 'string') {
+        query = query.eq('dynasty_name', params.dynasty)
+      }
+
+      if (params.tags && Array.isArray(params.tags) && params.tags.length > 0) {
+        query = query.in('poem_type', params.tags)
+      }
+
+      const { data, error } = await query.order('title')
+
+      if (error) {
+        console.error('搜索错误:', error)
+        throw error
+      }
+
+      console.log('搜索到数据:', data?.length || 0, '条')
+
+      // 类型安全的数据转换
+      const results = (data || []).map((item: any) => {
+        // 确保必要字段存在
+        if (!item.id || !item.title || !item.content || !item.poet_name || !item.dynasty_name) {
+          console.warn('跳过无效的诗歌数据:', item)
+          return null
+        }
+
+        return {
+          id: item.id.toString(),
+          title: item.title,
+          content: item.content,
+          poetId: `poet_${item.poet_name}_${item.dynasty_name}`.replace(/\s+/g, '_'),
+          poet: {
+            id: `poet_${item.poet_name}_${item.dynasty_name}`.replace(/\s+/g, '_'),
+            name: item.poet_name,
+            dynasty: item.dynasty_name,
+            biography: item.poet_description || '',
+            tags: [],
+          },
+          dynasty: item.dynasty_name,
+          tags: [item.poem_type || '未知类型'],
+          createdAt: item.created_at ? new Date(item.created_at) : new Date(),
+          updatedAt: item.created_at ? new Date(item.created_at) : new Date(),
+        }
+      }).filter(Boolean) as Poem[] // 过滤掉null值
+
+      searchResults.value = results
+      console.log('搜索结果:', results)
+      return results
+    } catch (error) {
+      console.error('搜索诗歌失败:', error)
+      // 返回空数组而不是抛出错误，避免UI崩溃
+      return []
+    } finally {
+      isLoading.value = false
     }
-    return poet
   }
 
-  const getRelatedPoems = (poem: Poem) => {
-    return poems.value
-      .filter((p) => p.id !== poem.id && p.tags.some((tag) => poem.tags.includes(tag)))
-      .slice(0, 3)
+  const getPoemById = async (id: string) => {
+    try {
+      const { data, error } = await supabase.from('poetry_view').select('*')
+
+      if (error) throw error
+
+      // 在客户端过滤
+      const poemData = data.find((item: any) => item.id === parseInt(id))
+
+      if (poemData) {
+        const poetId = `poet_${poemData.poet_name}_${poemData.dynasty_name}`.replace(/\s+/g, '_')
+        const poet = {
+          id: poetId,
+          name: poemData.poet_name,
+          dynasty: poemData.dynasty_name,
+          biography: poemData.poet_description || '',
+          tags: [],
+        }
+
+        const poem = {
+          id: poemData.id.toString(),
+          title: poemData.title,
+          content: poemData.content,
+          poetId,
+          poet,
+          dynasty: poemData.dynasty_name,
+          tags: [poemData.poem_type],
+          createdAt: new Date(poemData.created_at),
+          updatedAt: new Date(poemData.created_at),
+        }
+
+        currentPoem.value = poem
+        return poem
+      }
+    } catch (error) {
+      console.error('获取诗歌详情失败:', error)
+    }
+    return null
+  }
+
+  const getPoetById = async (id: string) => {
+    try {
+      const { data, error } = await supabase.from('poets').select('*')
+
+      if (error) throw error
+
+      if (data) {
+        // 在客户端查找诗人
+        const poetData = data.find((item: any) => item.id === parseInt(id))
+
+        if (poetData) {
+          const dynasty = poetData.dynasty_id ? await getDynastyName(poetData.dynasty_id) : ''
+
+          const poet = {
+            id: poetData.id.toString(),
+            name: poetData.name,
+            dynasty,
+            biography: poetData.description || '',
+            tags: [],
+          }
+
+          currentPoet.value = poet
+          return poet
+        }
+      }
+    } catch (error) {
+      console.error('获取诗人详情失败:', error)
+    }
+    return null
+  }
+
+  const getRelatedPoems = async (poem: Poem) => {
+    try {
+      // 检查tags是否存在且有内容
+      if (!poem.tags || poem.tags.length === 0) {
+        console.warn('诗歌没有标签，无法获取相关诗歌')
+        return []
+      }
+
+      // 获取所有诗歌数据
+      const { data, error } = await supabase.from('poetry_view').select('*')
+
+      if (error) throw error
+
+      if (data) {
+        // 在客户端过滤相同类型的诗歌
+        const relatedPoems = data
+          .filter((item: any) => item.id !== parseInt(poem.id) && item.poem_type === poem.tags[0])
+          .slice(0, 3)
+
+        return relatedPoems.map((item: any) => ({
+          id: item.id.toString(),
+          title: item.title,
+          content: item.content,
+          poetId: `poet_${item.poet_name}_${item.dynasty_name}`.replace(/\s+/g, '_'),
+          poet: {
+            id: `poet_${item.poet_name}_${item.dynasty_name}`.replace(/\s+/g, '_'),
+            name: item.poet_name,
+            dynasty: item.dynasty_name,
+            biography: item.poet_description || '',
+            tags: [],
+          },
+          dynasty: item.dynasty_name,
+          tags: [item.poem_type],
+          createdAt: new Date(item.created_at),
+          updatedAt: new Date(item.created_at),
+        }))
+      }
+    } catch (error) {
+      console.error('获取相关诗歌失败:', error)
+    }
+    return []
+  }
+
+  // 辅助函数
+  const getTypeColor = (typeName: string): string => {
+    const colorMap: Record<string, string> = {
+      思乡诗: '#8b5a2b',
+      山水诗: '#4a90e2',
+      记行诗: '#f5a623',
+      送别诗: '#d0021b',
+      抒情诗: '#7ed321',
+      咏物诗: '#bd10e0',
+      爱国诗: '#ff6b6b',
+      田园诗: '#4ecdc4',
+      怀古诗: '#45b7d1',
+      爱情诗: '#ff9ff3',
+      酬赠诗: '#54a0ff',
+      边塞诗: '#ff9f43',
+      叙事诗: '#a55eea',
+      讽喻诗: '#fd9644',
+      亲情诗: '#26de81',
+      哲理诗: '#2bcbba',
+      节日诗: '#ff7f50',
+      咏史怀古: '#778beb',
+    }
+    return colorMap[typeName] || '#8b5a2b'
+  }
+
+  // 获取诗人ID
+  const getPoetIdByName = async (poetName: string, dynasty: string): Promise<string> => {
+    // 直接返回基于名称和朝代的唯一ID，避免数据库查询
+    return `poet_${poetName}_${dynasty}`.replace(/\s+/g, '_')
+  }
+
+  // 获取诗人信息
+  const getPoetInfo = async (poetName: string, dynasty: string, description?: string) => {
+    // 直接返回默认诗人信息，避免数据库查询
+    return {
+      id: `poet_${poetName}_${dynasty}`.replace(/\s+/g, '_'),
+      name: poetName,
+      dynasty: dynasty,
+      biography: description || '',
+      tags: [],
+    }
+  }
+
+  const getDynastyName = async (dynastyId: number): Promise<string> => {
+    try {
+      const { data, error } = await supabase.from('dynasties').select('*')
+
+      if (error) throw error
+
+      if (data) {
+        // 在客户端查找朝代
+        const dynastyData = data.find((item: any) => item.id === dynastyId)
+        return dynastyData?.name || ''
+      }
+      return ''
+    } catch (error) {
+      console.error('获取朝代名称失败:', error)
+      return ''
+    }
+  }
+
+  // 初始化数据
+  const initializeData = async () => {
+    await fetchPoemTypes()
+    await fetchAllPoems()
   }
 
   return {
     // 状态
     poems,
     poets,
+    poemTypes,
     currentPoem,
     currentPoet,
     searchResults,
@@ -391,11 +464,16 @@ export const usePoetryStore = defineStore('poetry', () => {
     // Getter
     featuredPoems,
     popularPoets,
+    categories,
 
     // Actions
+    fetchPoemTypes,
+    fetchPoemsByType,
+    fetchAllPoems,
     searchPoems,
     getPoemById,
     getPoetById,
     getRelatedPoems,
+    initializeData,
   }
 })

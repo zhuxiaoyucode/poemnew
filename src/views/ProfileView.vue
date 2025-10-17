@@ -31,8 +31,12 @@ const handleThemeChange = () => {
 const loadUserData = () => {
   if (userStore.isLoggedIn) {
     // 重新获取阅读历史数据
-    readingHistory.value = userStore.getReadingHistory()
-    favoritePoems.value = userStore.getFavoritePoems()
+    userStore.getReadingHistory().then((history) => {
+      readingHistory.value = history as any[]
+    })
+    userStore.getFavoritePoems().then((favorites) => {
+      favoritePoems.value = favorites as string[]
+    })
   } else {
     readingHistory.value = []
     favoritePoems.value = []
@@ -144,7 +148,7 @@ const logout = () => {
               <p>{{ getPoemById(activity.poemId)?.poet?.name || '未知诗人' }}</p>
             </div>
             <div class="activity-time">
-              {{ activity.createdAt.toLocaleString() }}
+              {{ activity.createdAt?.toLocaleString() || '未知时间' }}
             </div>
           </div>
         </div>
@@ -216,14 +220,15 @@ const logout = () => {
 <style scoped>
 .profile-view {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  padding: 40px 0;
+  background: #f8f9fa;
+  padding: 2rem 0;
 }
 
 .container {
-  max-width: 800px;
+  width: 100%;
+  max-width: none;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 2rem;
 }
 
 /* 用户信息卡片 */
