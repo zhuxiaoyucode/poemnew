@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
+import { Suspense } from 'vue'
 import AppHeader from '@/components/common/AppHeader.vue'
 import AppFooter from '@/components/common/AppFooter.vue'
 import { useThemeStore } from '@/stores/theme'
@@ -17,9 +18,20 @@ onMounted(() => {
 
 <template>
   <div class="app">
+    <div class="top-progress" aria-hidden="true"></div>
     <AppHeader />
     <main class="main-content">
-      <RouterView />
+      <Suspense>
+        <template #default>
+          <RouterView />
+        </template>
+        <template #fallback>
+          <div class="route-loading">
+            <div class="spinner" />
+            <div>页面加载中...</div>
+          </div>
+        </template>
+      </Suspense>
     </main>
     <AppFooter />
   </div>
@@ -200,5 +212,61 @@ body {
 
 .dark-theme ::-webkit-scrollbar-thumb:hover {
   background: #666666;
+}
+.route-loading {
+  min-height: 40vh;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+}
+
+.route-loading .spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #eee;
+  border-top-color: #8b5a2b;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* 顶部进度条（无需依赖） */
+.top-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 0%;
+  background: #8b5a2b;
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+body.route-loading-active .top-progress {
+  opacity: 1;
+  animation: topbar 1.2s ease-in-out infinite;
+}
+
+@keyframes topbar {
+  0% {
+    width: 0%;
+    transform: translateX(0);
+  }
+  50% {
+    width: 60%;
+    transform: translateX(40%);
+  }
+  100% {
+    width: 0%;
+    transform: translateX(100%);
+  }
 }
 </style>

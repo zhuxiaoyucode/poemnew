@@ -7,11 +7,22 @@ import { checkTablesExist } from './utils/database'
 // 导入全局样式
 import './assets/main.css'
 
+// 生产环境减少噪声日志（保留 warn/error）
+if (import.meta.env.PROD) {
+  console.log = () => {}
+  console.debug = () => {}
+}
+
 const app = createApp(App)
 const pinia = createPinia()
 
 app.use(pinia)
 app.use(router)
+
+// 全局错误处理（避免错误干扰用户，统一记录）
+app.config.errorHandler = (err, instance, info) => {
+  console.warn('全局错误捕获:', { err, info })
+}
 
 // 检查数据库表是否存在（静默处理错误，不影响应用启动）
 checkTablesExist()

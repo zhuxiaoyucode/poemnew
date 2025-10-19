@@ -1,10 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '@/views/HomeView.vue'
-import PoemDetailView from '@/views/PoemDetailView.vue'
-import TopicView from '@/views/TopicView.vue'
-import LoginView from '@/views/LoginView.vue'
-import RegisterView from '@/views/RegisterView.vue'
-import CategoryView from '@/views/CategoryView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -12,7 +6,7 @@ const router = createRouter({
     {
       path: '/',
       name: 'home',
-      component: HomeView,
+      component: () => import('@/views/HomeView.vue'),
       meta: { title: '诗海寻梦 - AI赋能诗词赏析' },
     },
     {
@@ -22,19 +16,19 @@ const router = createRouter({
     {
       path: '/login',
       name: 'login',
-      component: LoginView,
+      component: () => import('@/views/LoginView.vue'),
       meta: { title: '登录 - 诗海寻梦' },
     },
     {
       path: '/register',
       name: 'register',
-      component: RegisterView,
+      component: () => import('@/views/RegisterView.vue'),
       meta: { title: '注册 - 诗海寻梦' },
     },
     {
       path: '/poem/:id',
       name: 'poem',
-      component: PoemDetailView,
+      component: () => import('@/views/PoemDetailView.vue'),
       meta: { title: '诗词详情 - 诗海寻梦' },
     },
     {
@@ -58,24 +52,56 @@ const router = createRouter({
     {
       path: '/topic/:id',
       name: 'topic',
-      component: TopicView,
+      component: () => import('@/views/TopicView.vue'),
       meta: { title: '专题详情 - 诗海寻梦' },
     },
     {
       path: '/categories',
       name: 'categories',
-      component: CategoryView,
+      component: () => import('@/views/CategoryView.vue'),
       meta: { title: '诗歌分类 - 诗海寻梦' },
     },
+    {
+      path: '/chat',
+      name: 'chat',
+      component: () => import('@/views/ChatView.vue'),
+      meta: { title: '诗歌问答 - 诗海寻梦' },
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      component: () => import('@/views/NotFoundView.vue'),
+      meta: { title: '未找到 - 诗海寻梦' },
+    },
   ],
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) return savedPosition
+    return { top: 0 }
+  },
 })
 
-// 路由守卫 - 设置页面标题
+/**
+ * 路由守卫
+ * - 设置页面标题
+ * - 开启/关闭顶栏进度条
+ */
 router.beforeEach((to, _from, next) => {
   if (to.meta.title) {
     document.title = to.meta.title as string
   }
+  // 开启轻量进度条（通过 body class 控制样式动画）
+  document.body.classList.add('route-loading-active')
   next()
+})
+
+// 成功后关闭进度条
+router.afterEach(() => {
+  document.body.classList.remove('route-loading-active')
+})
+
+// 导航异常时关闭进度条
+router.onError(() => {
+  document.body.classList.remove('route-loading-active')
 })
 
 export default router

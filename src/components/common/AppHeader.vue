@@ -63,6 +63,7 @@ const logoutAndCloseMenu = () => {
         <nav class="nav-section">
           <router-link to="/" class="nav-link">首页</router-link>
           <router-link to="/search" class="nav-link">探索</router-link>
+          <router-link to="/chat" class="nav-link">诗歌问答</router-link>
           <router-link v-if="userStore.isLoggedIn" to="/profile" class="nav-link"
             >个人中心</router-link
           >
@@ -86,6 +87,7 @@ const logoutAndCloseMenu = () => {
       <div v-if="isMenuOpen" class="mobile-menu">
         <router-link to="/" class="mobile-nav-link" @click="toggleMenu">首页</router-link>
         <router-link to="/search" class="mobile-nav-link" @click="toggleMenu">探索</router-link>
+        <router-link to="/chat" class="mobile-nav-link" @click="toggleMenu">诗歌问答</router-link>
         <router-link
           v-if="userStore.isLoggedIn"
           to="/profile"

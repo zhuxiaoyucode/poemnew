@@ -5,7 +5,7 @@ import type { User, UserPreferences, UserActivity } from '@/types/user'
 
 // 创建使用服务角色密钥的客户端（绕过RLS）
 const createServiceRoleClient = async () => {
-  const serviceKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY
+  const serviceKey = (import.meta as any).env.VITE_SUPABASE_SERVICE_ROLE_KEY
   if (!serviceKey) {
     console.warn('服务角色密钥未配置，使用普通客户端（可能受RLS限制）')
     return supabase
@@ -14,7 +14,7 @@ const createServiceRoleClient = async () => {
   try {
     // 使用动态导入
     const { createClient } = await import('@supabase/supabase-js')
-    return createClient(import.meta.env.VITE_SUPABASE_URL, serviceKey)
+    return createClient((import.meta as any).env.VITE_SUPABASE_URL, serviceKey)
   } catch (error) {
     console.error('创建服务角色客户端失败:', error)
     return supabase
@@ -263,19 +263,7 @@ export const useUserStore = defineStore('user', () => {
   const recordActivity = async (poemId: string, activityType: UserActivity['activityType']) => {
     if (!currentUser.value) return
 
-    // 保存到数据库
-    const { error } = await supabase.from('user_activities').insert({
-      user_id: currentUser.value.id,
-      poem_id: poemId,
-      activity_type: activityType,
-    })
-
-    if (error) {
-      console.error('记录活动失败:', error)
-      return
-    }
-
-    // 同时更新本地状态
+    // 先准备本地活动对象
     const activity: UserActivity = {
       id: Date.now().toString(),
       userId: currentUser.value.id,
@@ -284,6 +272,18 @@ export const useUserStore = defineStore('user', () => {
       createdAt: new Date(),
     }
 
+    // 尝试保存到数据库（若为模拟客户端会失败）
+    const { error } = await supabase.from('user_activities').insert({
+      user_id: currentUser.value.id,
+      poem_id: poemId,
+      activity_type: activityType,
+    })
+
+    if (error) {
+      console.warn('记录活动到远端失败，已使用本地数据代替:', error)
+    }
+
+    // 无论成败，都更新本地状态，保证前端可见
     userActivities.value.push(activity)
   }
 
@@ -305,29 +305,58 @@ export const useUserStore = defineStore('user', () => {
   const getReadingHistory = async () => {
     if (!currentUser.value) return []
 
-    // 从数据库获取阅读历史
+    // 优先尝试从数据库获取
     const result = await supabase.from('user_activities').select('*')
 
-    if (result.error) {
-      console.error('获取阅读历史失败:', result.error)
-      return []
+    if (!result.error && Array.isArray(result.data) && result.data.length > 0) {
+      // 返回为 UserActivity[]，与视图期望一致
+      return result.data
+        .filter((a: any) => a.activity_type === 'view' && a.user_id === currentUser.value?.id)
+        .map(
+          (a: any): UserActivity => ({
+            id: a.id?.toString?.() ?? `${a.user_id}-${a.poem_id}-${a.created_at ?? Date.now()}`,
+            userId: a.user_id,
+            poemId: a.poem_id,
+            activityType: 'view',
+            createdAt: a.created_at ? new Date(a.created_at) : new Date(),
+          }),
+        )
+        .sort((a: UserActivity, b: UserActivity) => b.createdAt.getTime() - a.createdAt.getTime())
     }
 
-    return result.data ? result.data.map((activity: any) => activity.poem_id) : []
+    // 回退：使用本地内存的 userActivities
+    const local = userActivities.value
+      .filter((a) => a.activityType === 'view' && a.userId === currentUser.value?.id)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+
+    return local
   }
 
   const getFavoritePoems = async () => {
     if (!currentUser.value) return []
 
-    // 从数据库获取收藏的诗词
+    // 优先尝试从数据库获取
     const result = await supabase.from('user_activities').select('*')
 
-    if (result.error) {
-      console.error('获取收藏列表失败:', result.error)
-      return []
+    if (!result.error && Array.isArray(result.data) && result.data.length > 0) {
+      // 将 like 与 collect 都视为收藏
+      return result.data
+        .filter(
+          (a: any) =>
+            (a.activity_type === 'collect' || a.activity_type === 'like') &&
+            a.user_id === currentUser.value?.id,
+        )
+        .map((a: any) => a.poem_id)
     }
 
-    return result.data ? result.data.map((activity: any) => activity.poem_id) : []
+    // 回退：使用本地内存
+    return userActivities.value
+      .filter(
+        (a) =>
+          (a.activityType === 'collect' || a.activityType === 'like') &&
+          a.userId === currentUser.value?.id,
+      )
+      .map((a) => a.poemId)
   }
 
   // 初始化：检查本地存储的用户信息

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
 import { useUserStore } from '@/stores/user'
+import { useRouter } from 'vue-router'
 import { usePoetryStore } from '@/stores/poetry'
 import { useThemeStore } from '@/stores/theme'
 import type { UserActivity } from '@/types/user'
@@ -8,6 +9,7 @@ import type { UserActivity } from '@/types/user'
 const userStore = useUserStore()
 const poetryStore = usePoetryStore()
 const themeStore = useThemeStore()
+const router = useRouter()
 
 const activeTab = ref('history')
 const readingHistory = ref<UserActivity[]>([])
@@ -19,7 +21,9 @@ const userStats = computed(() => ({
   poemsShared: userStore.userActivities.filter((a) => a.activityType === 'share').length,
 }))
 
-onMounted(() => {
+onMounted(async () => {
+  // 确保诗歌数据已加载，便于根据诗歌ID关联作者
+  await poetryStore.fetchAllPoems()
   loadUserData()
   themeStore.initTheme()
 })
@@ -56,11 +60,13 @@ watch(
 const getPoemById = (poemId: string) => {
   const poem = poetryStore.poems.find((p) => p.id === poemId)
   if (poem) {
-    // 关联诗人信息
-    const poet = poetryStore.poets.find((p) => p.id === poem.poetId)
+    // 优先使用诗歌自带的诗人信息；若无则回退到 poets 列表（兼容 poetId/poet_id）
+    const poetId = (poem as any).poetId || (poem as any).poet_id
+    const poet = poem.poet || poetryStore.poets.find((poetItem) => poetItem.id === poetId) || null
+
     return {
       ...poem,
-      poet: poet || null,
+      poet,
     }
   }
   return null
@@ -71,6 +77,10 @@ const clearHistory = () => {
     userStore.userActivities = userStore.userActivities.filter((a) => a.activityType !== 'view')
     readingHistory.value = []
   }
+}
+
+const viewPoem = (poemId: string) => {
+  router.push({ name: 'poem', params: { id: poemId } })
 }
 
 const logout = () => {
@@ -142,7 +152,12 @@ const logout = () => {
         </div>
 
         <div v-if="readingHistory.length > 0" class="history-list">
-          <div v-for="activity in readingHistory" :key="activity.id" class="history-item">
+          <div
+            v-for="activity in readingHistory"
+            :key="activity.id"
+            class="history-item"
+            @click="viewPoem(activity.poemId)"
+          >
             <div class="poem-info">
               <h4>{{ getPoemById(activity.poemId)?.title || '未知诗作' }}</h4>
               <p>{{ getPoemById(activity.poemId)?.poet?.name || '未知诗人' }}</p>
@@ -162,7 +177,12 @@ const logout = () => {
         <h2>我的收藏</h2>
 
         <div v-if="favoritePoems.length > 0" class="favorites-grid">
-          <div v-for="poemId in favoritePoems" :key="poemId" class="favorite-item">
+          <div
+            v-for="poemId in favoritePoems"
+            :key="poemId"
+            class="favorite-item"
+            @click="viewPoem(poemId)"
+          >
             <div class="poem-info">
               <h4>{{ getPoemById(poemId)?.title || '未知诗作' }}</h4>
               <p>{{ getPoemById(poemId)?.poet?.name || '未知诗人' }}</p>
@@ -368,6 +388,7 @@ const logout = () => {
   padding: 16px;
   border: 1px solid #e9ecef;
   border-radius: 6px;
+  cursor: pointer;
   transition: all 0.2s;
 }
 
@@ -402,6 +423,7 @@ const logout = () => {
   padding: 16px;
   border: 1px solid #e9ecef;
   border-radius: 6px;
+  cursor: pointer;
   transition: all 0.2s;
 }
 

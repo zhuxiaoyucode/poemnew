@@ -101,6 +101,10 @@ const navigateToRegister = () => {
   router.push({ name: 'register' })
 }
 
+const navigateToChat = () => {
+  router.push({ name: 'chat' })
+}
+
 // 初始化数据
 const initializeData = async () => {
   try {
@@ -114,6 +118,34 @@ const initializeData = async () => {
       icon: getCategoryIcon(cat.name),
       description: cat.description || '探索该主题的诗词作品',
     }))
+
+    // 用数据库的真实数据回填精选诗歌，确保ID匹配正确
+    const featuredTitles = ['静夜思', '春晓', '登鹳雀楼']
+    featuredPoems.value = featuredTitles.map((title) => {
+      const p = poetryStore.poems.find((po) => po.title === title)
+      if (p) {
+        return {
+          id: p.id,
+          title: p.title,
+          author: p.poet?.name || '',
+          dynasty: p.dynasty,
+          excerpt: (p.content || '').slice(0, 40),
+          tags: p.tags || [],
+        }
+      }
+      // 回退到原始占位（极端情况下未查到）
+      const fallback = featuredPoems.value.find((fp) => fp.title === title)
+      return (
+        fallback || {
+          id: '',
+          title,
+          author: '',
+          dynasty: '',
+          excerpt: '',
+          tags: [],
+        }
+      )
+    })
   } catch (err: any) {
     console.error('初始化数据失败:', err)
     error.value = err.message || '数据加载失败，请稍后重试'
@@ -189,6 +221,7 @@ onMounted(async () => {
             <div class="hero-actions">
               <button class="btn-primary" @click="navigateToSearch">开始探索</button>
               <button class="btn-secondary" @click="navigateToRegister">加入我们</button>
+              <button class="btn-primary" @click="navigateToChat">诗歌问答</button>
             </div>
           </div>
         </div>

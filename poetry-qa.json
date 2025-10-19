@@ -1,0 +1,90 @@
+{
+  "name": "Poetry QA (Quick, HTTP+Code)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "poetry-qa",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "WebhookNode",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 300],
+      "webhookId": "poetry-qa-webhook"
+    },
+    {
+      "parameters": {
+        "language": "JavaScript",
+        "jsCode": "/**\\n * 构造系统提示与用户提示，并要求 LLM 严格输出 JSON\\n */\\nconst body = $json || {};\\nconst question = (body.question || \"\").trim();\\nconst context = (body.context || \"\").trim();\\nconst mode = (body.mode || \"auto\").trim();\\n\\nconst system = `\\n你是一位严谨且亲切的古典诗词老师。请用简体中文，结构化、准确地回答。\\n任务类型包括:\\n- read: 规范展示诗文(题目/作者/朝代/原文/拼音可选/白话译文)\\n- analysis: 赏析(主题/意象/修辞/结构/情感/典故/艺术特色/名句点拨)\\n- compare: 对比两首诗(相同/不同/手法/风格/格律/历史语境)\\n- style: 这首诗的风格特色与流派归属\\n- poet_style: 诗人的生平、创作背景与风格特征\\n\\n要求:\\n- 引用古诗必须准确，必要时用【引号】标明原句。\\n- 若不确定，明确说明不确定并给出可能方向，不要编造史实。\\n- 用分点与小标题组织答案，突出重点。\\n`;\\n\\nconst user = `\\n用户问题: ${question}\\n\\n可用上下文(可为空):\\n${context}\\n\\n若 mode=auto，请先在心中判断最合适的任务类型，再按该类型组织答案。\\n输出时，请尽量给出:\\n- 关键信息摘要\\n- 结构化讲解\\n- 若涉及人物/朝代/典故，给出简要背景\\n- 延伸学习建议(如相似主题诗作、典型考点)\\n`;\\n\\nconst response_format = `\\n请返回JSON对象:\\n{\\n  \\\"task\\\": \\\"read|analysis|compare|style|poet_style\\\",\\n  \\\"answer\\\": \\\"主回答，分点与小标题\\\",\\n  \\\"highlights\\\": [\\\"要点1\\\",\\\"要点2\\\"],\\n  \\\"citations\\\": [\\\"若使用到具体版本/注本/史料，请在此列出(可为空)\\\"],\\n  \\\"suggestions\\\": [\\\"延伸阅读或相近题材诗作(可为空)\\\"]\\n}\\n`;\\n\\nreturn [{ json: { system, user, response_format, mode } }];"
+      },
+      "id": "BuildPrompt",
+      "name": "Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [540, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.openai.com/v1/chat/completions",
+        "responseFormat": "json",
+        "options": {
+          "headers": {
+            "entries": [
+              { "name": "Content-Type", "value": "application/json" },
+              { "name": "Authorization", "value": "={{'Bearer ' & $env.OPENAI_API_KEY}}" }
+            ]
+          }
+        },
+        "sendBody": true,
+        "jsonBody": "={\\n  \"model\": \"gpt-4o-mini\",\\n  \"temperature\": 0.3,\\n  \"messages\": [\\n    { \"role\": \"system\", \"content\": $json.system },\\n    { \"role\": \"user\", \"content\": $json.user & \"\\n\\n严格按以下JSON格式输出，不要包含多余文本:\\n\" & $json.response_format }\\n  ]\\n}"
+      },
+      "id": "HTTPOpenAI",
+      "name": "HTTP Request (OpenAI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [820, 300]
+    },
+    {
+      "parameters": {
+        "language": "JavaScript",
+        "jsCode": "/*\\n 从 HTTP 返回中提取 content 并尝试 JSON.parse；失败则回退原文\\n*/\\nconst j = $json || {};\\nconst raw = j.choices?.[0]?.message?.content ?? j.message ?? j.text ?? j.data ?? j.output ?? \"\";\\nlet data;\\nif (typeof raw === 'string') {\\n  try { data = JSON.parse(raw); } catch (e) { data = { parsingError: true, raw }; }\\n} else if (raw && typeof raw === 'object') {\\n  data = raw;\\n} else {\\n  data = { parsingError: true, raw };\\n}\\nreturn [{ json: { data } }];"
+      },
+      "id": "NormalizeOutput",
+      "name": "Normalize Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1080, 300]
+    },
+    {
+      "parameters": {
+        "responseBody": "={{$json.data}}",
+        "responseCode": 200,
+        "options": {
+          "responseHeaders": {
+            "entries": [{ "name": "Content-Type", "value": "application/json" }]
+          }
+        }
+      },
+      "id": "RespondNode",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1340, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Build Prompt", "type": "main", "index": 0 }]] },
+    "Build Prompt": { "main": [[{ "node": "HTTP Request (OpenAI)", "type": "main", "index": 0 }]] },
+    "HTTP Request (OpenAI)": {
+      "main": [[{ "node": "Normalize Output", "type": "main", "index": 0 }]]
+    },
+    "Normalize Output": { "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {},
+  "staticData": {}
+}
